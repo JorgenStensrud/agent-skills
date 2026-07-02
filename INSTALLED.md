@@ -47,6 +47,11 @@ Bound to your claude.ai login, follow the session — not locally installed.
 
 Live in this repo. `~/.claude/skills` is a symlink to `./skills`.
 
+| Skill | Purpose |
+|---|---|
+| `handover-to-codex` | Delegate a coding task to a headless Codex agent (`codex exec`); runs in a fresh worktree by default, reports final message + transcript back |
+| `handover-to-cursor` | Same, but the worker is Cursor's CLI (`agent`) instead of Codex |
+
 - Add: `mkdir skills/<name>` + `SKILL.md` with YAML frontmatter (`name`, `description`)
 - Remove: `git rm -r skills/<name>`
 - Rename: `git mv skills/<old> skills/<new>` and update the `name:` field
