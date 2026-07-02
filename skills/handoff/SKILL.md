@@ -81,18 +81,20 @@ handoff dispatch --backend cursor \
 # -> {"task_id":"20260702-add-a-health-endpoint","backend":"cursor-agent","session_id":"...","pid":54321,"log":".handoffs/20260702-add-a-health-endpoint/attempt-1.log"}
 ```
 
-### `handoff list [--json] [--status <s>]`
+### `handoff list [--json] [--status <s>] [--safe]`
 
 Walks `.handoffs/*/state.json` under cwd. For each, reconciles the stored PID:
 if state says `running` but `kill -0 <pid>` fails (or `ps lstart` disagrees
 with the stored `pid_start`), tails the log for the backend's terminal event
 and rewrites status to `done` or `error`. Prints a sorted table by
-`updated_at` desc, or JSON with `--json`.
+`updated_at` desc, or JSON with `--json`. `--safe` runs the output through
+the redaction filter (see "Redaction" below).
 
-### `handoff status <task_id>`
+### `handoff status <task_id> [--safe]`
 
 Reconciles as `list` does for one task. Prints the rendered `handoff.md`,
-then the last 40 lines of the newest `attempt-N.log`.
+then the last 40 lines of the newest `attempt-N.log`. `--safe` redacts the
+output before printing.
 
 ### `handoff cancel <task_id>`
 
@@ -110,20 +112,67 @@ Refuses when status ∈ {running, cancelled}. Bumps to attempt `N+1`.
 - **codex**: **refused** — points at the codex-plugin `/rescue`. The
   `Headed Takeover Prompt` section of `handoff.md` is the crossover point.
 
-### `handoff takeover <task_id> [--exec]`
+### `handoff takeover <task_id> [--exec] [--raw]`
 
 Without `--exec`: prints the `Headed Takeover Prompt` section of
 `handoff.md` so the caller can paste it into an interactive session.
+**Output is redacted by default** — its whole purpose is external paste, so
+safety is on unless you explicitly opt out with `--raw`.
 
 With `--exec`: execs the backend interactively against the stored session:
 
 - **cursor**: `exec cursor-agent --resume <session_id>` (no `-p`)
 - **claude**: `exec claude --resume <session_id>`
 - **codex**: `exec codex resume <session_id>` if the CLI supports it in that
-  install, else prints the prompt.
+  install, else prints the prompt (still redacted unless `--raw`).
 
 `takeover_at` is stamped in `state.json`; status is left untouched (the
 interactive shell now owns the chat).
+
+## Redaction — when to apply `--safe` / `--raw`
+
+The skill has a small built-in redaction filter (`state.py redact`) that
+scrubs the common leak types before printing: `$HOME`-absolute paths,
+`TOKEN=`/`KEY=`/`SECRET=`/`PASSWORD=` env-var assignments, Slack/AWS/GitHub/
+OpenAI/Anthropic API tokens, `Bearer <jwt>`, and SSH private-key blocks.
+
+**Trust boundary by design:**
+
+| Data path | Redacted? | Why |
+|---|---|---|
+| `takeover` output | **Yes, by default** | Meant to paste into another agent, Slack, PR comment, issue — external eyes |
+| `takeover --raw` | No | Opt-out when you trust the destination (private notes, personal draft) |
+| `list --safe` / `status --safe` | Yes (opt-in) | Same reason — display is being shared |
+| `list` / `status` (no flag) | No | Local inspection; user needs the real paths and IDs |
+| `dispatch` / `resume` stdout JSON | No | Contains the log path the user must `tail -f` |
+| `handoff.md` on disk | No | Local scratch — full context needed for the operator |
+| `state.json`, `attempt-*.log` on disk | No | Internal storage; scrub on read, not on write |
+
+**Decision rules for the invoking agent (Claude):**
+
+Reach for `--safe` on `list`/`status`, or trust the takeover default, when
+the user's phrasing implies external consumption:
+
+- "share this with the team", "send to Slack", "paste into the PR", "for the
+  issue comment", "email the team", "give me something I can copy"
+- Explicit clipboard piping: `handoff status <id> --safe | pbcopy`
+- Sharing patterns: screenshots for review, public gists, external chat
+
+Skip `--safe` (or use `--raw` on takeover) when:
+
+- User is inspecting their own status locally: "what's it doing", "how far",
+  "which one is running", "tail the log"
+- User asks for full details / debugging output ("give me the raw log",
+  "show everything")
+- Context is a private note the user is writing for themselves
+
+When ambiguous, prefer the safer default: `--safe` on list/status if the
+result is going anywhere outside the terminal, and don't override the
+takeover default unless the user is clearly staying local.
+
+**Never dispatch, resume, or otherwise mutate state based on `--safe`
+output** — redaction can drop information the operator needs. `--safe` is
+strictly for display / sharing.
 
 ## What lives on disk
 
@@ -249,4 +298,17 @@ handoff takeover 20260702-refactor-server-routes-scorers --exec
 
 ```bash
 handoff list --status running
+```
+
+### Share the takeover prompt with a teammate
+
+```bash
+# takeover output is redacted by default — safe to paste into Slack / PR / issue.
+handoff takeover 20260702-refactor-server-routes-scorers | pbcopy
+
+# Grab a redacted status snapshot for the standup or a PR comment:
+handoff status 20260702-refactor-server-routes-scorers --safe | pbcopy
+
+# You're keeping it local (personal notes, no external eyes) — skip redaction:
+handoff takeover 20260702-refactor-server-routes-scorers --raw
 ```
