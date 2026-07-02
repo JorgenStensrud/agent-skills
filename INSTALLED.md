@@ -51,22 +51,18 @@ Live in this repo. `~/.claude/skills` is a symlink to `./skills`.
 - Remove: `git rm -r skills/<name>`
 - Rename: `git mv skills/<old> skills/<new>` and update the `name:` field
 
-## Symlinked external skills (repo-owned, kept in sync via git pull)
+## Pointer skills (one skill, points to a real toolset elsewhere)
 
-Point to another local git clone so upstream updates carry over automatically.
+Single-skill wrappers whose only job is to be discoverable globally and route
+you into the real skills that live in another repo. Prefer this over
+symlinking many external skills — one entry in Available skills, not six.
 
-| Skill | Source repo | Purpose |
+| Skill | Points to | Purpose |
 |---|---|---|
-| `defending-code-quickstart` | `~/dev/work/defending-code-reference-harness` | Orient in the vuln-scan harness — scoping and workflow |
-| `defending-code-threat-model` | same | Threat-modeling a target codebase |
-| `defending-code-vuln-scan` | same | Autonomous vuln discovery (C/C++ memory via Docker + ASAN by default) |
-| `defending-code-triage` | same | Triage findings (false-positive filtering, severity) |
-| `defending-code-patch` | same | Generate & verify patches for confirmed findings |
-| `defending-code-customize` | same | Port the harness to a new language/vuln class |
+| `defending-code` | `~/dev/work/defending-code-reference-harness` | Anthropic vuln-discovery harness. Lists the 6 real sub-skills (quickstart, threat-model, vuln-scan, triage, patch, customize) and how to reach them (cd into the repo, they're active there). |
 
-Upstream: [anthropics/defending-code-reference-harness](https://github.com/anthropics/defending-code-reference-harness).
-Anthropic reference implementation — not maintained, no contributions accepted.
-To update the local clone: `cd ~/dev/work/defending-code-reference-harness && git pull`.
+Upstream sources should carry the actual skills — the wrapper just tells you
+where. To update: `git pull` in the source repo.
 
 ## Auto-update behavior
 
