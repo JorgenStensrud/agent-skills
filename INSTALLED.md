@@ -49,8 +49,7 @@ Live in this repo. `~/.claude/skills` is a symlink to `./skills`.
 
 | Skill | Purpose |
 |---|---|
-| `handover-to-codex` | Delegate a coding task to a headless Codex agent (`codex exec`); runs in a fresh worktree by default, reports final message + transcript back |
-| `handover-to-cursor` | Same, but the worker is Cursor's CLI (`agent`) instead of Codex |
+| `handoff` | Unified cross-backend background dispatch — verbs: dispatch, list, status, cancel, resume, takeover. Backends: cursor-agent (primary), codex, claude. State repo-locally in `.handoffs/<YYYYMMDD-slug>/`. Replaces the old lightweight `handover-to-codex` / `handover-to-cursor` scripts. |
 
 - Add: `mkdir skills/<name>` + `SKILL.md` with YAML frontmatter (`name`, `description`)
 - Remove: `git rm -r skills/<name>`
