@@ -54,7 +54,6 @@ Live in this repo. `~/.claude/skills` is a symlink to `./skills`.
 | `skill-cleaner` | Skill audit: budget, usage, duplicates, compact descriptions. Keeps the growing skill collection from turning into porridge. | Symlink → `~/dev/personal/steipete-agent-scripts/skills/skill-cleaner`. Auto-updates via `git -C ~/dev/personal/steipete-agent-scripts pull`. |
 | `create-cli` | CLI UX/spec conventions: args, flags, help, output, errors, config, dry-run. | Symlink → same clone. Auto-updates via git pull. |
 | `github-deep-review` | Deep GitHub PR review — fetch remote PR, read changed code first, distinguish stale-vs-real, propose the best fix. Fills the "review a GitHub PR in any repo" gap that codex plugin's `/review` doesn't cover (it targets local git state). | Symlink → same clone. Auto-updates via git pull. |
-| `github-project-triage` | Cross-repo PR/issue queue triage: CI state, blockers, risk, next action. Pairs with `github-deep-review` — triage to find the top hit, then deep-review that one. | Symlink → same clone. Auto-updates via git pull. |
 
 - Add: `mkdir skills/<name>` + `SKILL.md` with YAML frontmatter (`name`, `description`)
 - Remove: `git rm -r skills/<name>`
