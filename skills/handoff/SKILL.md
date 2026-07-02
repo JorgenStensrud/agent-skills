@@ -2,15 +2,11 @@
 name: handoff
 description: >-
   Dispatch, track, and resume long-running background agent tasks against a
-  cursor-agent, codex, or claude backend. Use whenever the user says "hand off
-  to cursor / codex / claude", "delegate this to a background agent", "spin up
-  a headless agent", "run this detached and check later", "status of the cursor
-  handoff", "cancel that handoff", "resume the handoff", or "take over the
-  handoff interactively". Every dispatch mints a durable task under
-  `.handoffs/<YYYYMMDD-slug>/` with `state.json` (single source of truth) and
-  a rendered `handoff.md` cover sheet, so runs survive shell/session crashes
-  and are discoverable with `ls`. Six verbs: dispatch, list, status, cancel,
-  resume, takeover.
+  cursor-agent, codex, or claude backend. Triggers: "hand off to cursor / codex
+  / claude", "delegate to a background agent", "spin up a headless agent",
+  "status of the handoff", "cancel/resume/take over the handoff". Durable
+  per-task state under `.handoffs/<YYYYMMDD-slug>/`. Six verbs: dispatch, list,
+  status, cancel, resume, takeover.
 allowed-tools: Bash, Read, Write
 ---
 

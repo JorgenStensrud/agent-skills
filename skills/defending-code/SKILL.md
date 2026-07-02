@@ -1,14 +1,11 @@
 ---
 name: defending-code
 description: >-
-  Entry point for the Anthropic defending-code-reference-harness — an
-  autonomous vulnerability discovery and remediation pipeline for Claude.
-  Use when asked to "threat model a repo", "scan for vulns", "triage
-  security findings", "patch these bugs", "port the vuln pipeline to <X>",
-  or generally when the user wants a recon → find → verify → report → patch
-  loop against a target codebase. The 6 real skills (quickstart, threat-model,
-  vuln-scan, triage, patch, customize) live in the harness repo itself, not
-  here — this wrapper tells you how to reach them and when each fits.
+  Pointer to the Anthropic defending-code-reference-harness — autonomous vuln
+  discovery + remediation pipeline. Triggers: "threat model a repo", "scan
+  for vulns", "triage security findings", "patch these bugs", or a recon →
+  find → verify → report → patch loop. The 6 real sub-skills live in the
+  harness repo; this wrapper routes you there.
 ---
 
 # Defending Code — pointer skill

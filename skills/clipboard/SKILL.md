@@ -1,6 +1,10 @@
 ---
 name: clipboard
-description: "Write a clipboard-ready prompt or message and copy it to the clipboard. Use when the user says 'draft a message', 'write a Slack message', 'prompt for another agent', 'clipboard this', 'copy to clipboard', 'compose a handoff prompt', or wants a stand-alone message they can paste elsewhere. Not for the durable background dispatch — that's the `handoff` skill. Renamed from Peter Steinberger's / openclaw's `handoff` skill so the name doesn't collide with our own `handoff` (which does headless dispatch, not message drafting)."
+description: >-
+  Write a clipboard-ready prompt or message for pasting elsewhere. Triggers:
+  "draft a message", "write a Slack message", "prompt for another agent",
+  "clipboard this", "copy to clipboard", "compose a handoff prompt". Not for
+  durable background dispatch — that's the `handoff` skill.
 ---
 
 # Handoff

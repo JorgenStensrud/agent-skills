@@ -1,0 +1,18 @@
+#!/usr/bin/env bash
+# Pre-commit hook: run scripts/validate-skills before allowing a commit.
+#
+# Install: from repo root:
+#   ln -sf ../../hooks/pre-commit .git/hooks/pre-commit
+#
+# Bypass one time: git commit --no-verify (use sparingly).
+set -euo pipefail
+
+REPO="$(git rev-parse --show-toplevel)"
+"$REPO/scripts/validate-skills" || {
+  cat >&2 <<EOF
+
+Commit blocked by hooks/pre-commit — fix the errors above and re-stage.
+Bypass (rarely): git commit --no-verify
+EOF
+  exit 1
+}
