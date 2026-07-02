@@ -1,11 +1,11 @@
 ---
 name: send-mail
 description: >-
-  Send a transactional email via Resend's REST API. Default recipient is
-  jorgen.stensrud@proton.me. Triggers: "email me", "mail me", "send this to
-  my inbox", "send me an email with X", "email the summary to Proton". Body
-  from stdin, --body, or --file; --html for HTML content; --to overrides
-  the default recipient.
+  Send a transactional email via Resend's REST API to jorgen.stensrud@proton.me
+  (or --to override). ONLY invoke when the user explicitly says to send mail —
+  "send me an email", "mail me", "email this to my inbox". Do NOT auto-invoke
+  as a side effect of another task. Body from stdin, --body, or --file; --html
+  for HTML content.
 ---
 
 # send-mail
@@ -13,12 +13,25 @@ description: >-
 Simple wrapper around the Resend REST API. One bash script, no dependencies
 beyond `curl` + `python3` (both stdlib-only usage).
 
+## Invocation rule — explicit only
+
+**Do not trigger this skill as a side effect.** Only invoke when the user
+explicitly asks to send mail:
+
+- ✅ "send me an email with the status"
+- ✅ "mail me the report"
+- ✅ "email this to Proton"
+- ❌ Do NOT auto-email at the end of a long task unless the user asked for it
+- ❌ Do NOT chain with other skills (e.g. `handoff | send-mail`) unless the
+  user explicitly wired that pipe themselves
+
+Silent notifications are a footgun: they send real mail to a real inbox and
+cost Resend quota. Ask if the user actually wants it.
+
 ## When this fits
 
-- User says "send me an email with the status", "mail me the report",
-  "email this to Proton", "shoot me an email when you're done".
-- User pipes something into it: `... | send-mail --subject "log tail"`.
-- User wants a script/subagent to notify them by email after a long job.
+- User asks to send an email — see rule above.
+- User pipes into it themselves: `some-cmd | send-mail --subject "log tail"`.
 
 Not for: transactional email from an application (use the Resend SDK
 directly), bulk sends, or anything where deliverability tracking matters
@@ -61,13 +74,6 @@ On success it prints one JSON line:
 ```
 
 Non-2xx exits 1 and prints the Resend error body to stderr.
-
-## Composing with other skills
-
-- `handoff status <id> --safe | send-mail --subject "handoff $id snapshot"`
-  — pipes a redacted handoff status straight to your inbox.
-- After a long background dispatch: agent picks up the task, calls
-  `send-mail --subject "handoff $id done" --body "$(handoff takeover $id)"`.
 
 ## Safety
 
