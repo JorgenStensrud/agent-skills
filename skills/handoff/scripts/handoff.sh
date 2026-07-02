@@ -212,12 +212,13 @@ verb_dispatch() {
 }
 
 verb_list() {
-  local as_json=0 status=""
+  local as_json=0 status="" safe=0
   while [[ $# -gt 0 ]]; do
     case "$1" in
       --json) as_json=1; shift;;
       --status) status="$2"; shift 2;;
-      -h|--help) printf 'usage: handoff list [--json] [--status <s>]\n'; return 0;;
+      --safe) safe=1; shift;;
+      -h|--help) printf 'usage: handoff list [--json] [--status <s>] [--safe]\n'; return 0;;
       *) die "list: unknown arg $1";;
     esac
   done
@@ -229,10 +230,15 @@ verb_list() {
     json="$("$PY" "$STATE_PY" list --root "$root")"
   fi
   if [[ "$as_json" -eq 1 ]]; then
-    printf '%s\n' "$json"
+    if [[ "$safe" -eq 1 ]]; then
+      printf '%s\n' "$json" | "$PY" "$STATE_PY" redact
+    else
+      printf '%s\n' "$json"
+    fi
     return 0
   fi
-  "$PY" - "$json" <<'PY'
+  local tbl
+  tbl="$("$PY" - "$json" <<'PY'
 import json, sys
 data = json.loads(sys.argv[1])
 if not data:
@@ -253,16 +259,33 @@ for s in data:
         task,
     ))
 PY
+  )"
+  if [[ "$safe" -eq 1 ]]; then
+    printf '%s\n' "$tbl" | "$PY" "$STATE_PY" redact
+  else
+    printf '%s\n' "$tbl"
+  fi
 }
 
 verb_status() {
-  local id="${1:-}"; [[ -n "$id" ]] || die "usage: handoff status <task_id>"
+  local safe=0
+  local args=()
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --safe) safe=1; shift;;
+      -h|--help) printf 'usage: handoff status <task_id> [--safe]\n'; return 0;;
+      *) args+=("$1"); shift;;
+    esac
+  done
+  set -- "${args[@]}"
+  local id="${1:-}"; [[ -n "$id" ]] || die "usage: handoff status <task_id> [--safe]"
   local root; root="$(pwd)"
   local dir="$root/.handoffs/$id"
   [[ -d "$dir" ]] || die "no such task: $id"
   "$PY" "$STATE_PY" reconcile --task-dir "$dir" >/dev/null
-  cat "$dir/handoff.md"
-  printf '\n--- last log tail (40 lines) ---\n'
+  local out=""
+  out+="$(cat "$dir/handoff.md")"
+  out+=$'\n\n--- last log tail (40 lines) ---\n'
   # Find newest attempt log by numeric N (attempt-10 > attempt-2). Portable —
   # no reliance on GNU sort -k, since the enclosing path may contain dashes.
   local latest="" max=0 n
@@ -276,10 +299,15 @@ verb_status() {
     fi
   done
   if [[ -n "$latest" ]]; then
-    printf '(%s)\n' "$latest"
-    tail -n 40 "$latest" || true
+    out+="($latest)"$'\n'
+    out+="$(tail -n 40 "$latest" 2>/dev/null || true)"
   else
-    printf '(no attempt logs)\n'
+    out+="(no attempt logs)"
+  fi
+  if [[ "$safe" -eq 1 ]]; then
+    printf '%s\n' "$out" | "$PY" "$STATE_PY" redact
+  else
+    printf '%s\n' "$out"
   fi
 }
 
@@ -411,13 +439,14 @@ PY
 }
 
 verb_takeover() {
-  local id="${1:-}"; [[ -n "$id" ]] || die "usage: handoff takeover <task_id> [--exec]"
+  local id="${1:-}"; [[ -n "$id" ]] || die "usage: handoff takeover <task_id> [--exec] [--raw]"
   shift || true
-  local do_exec=0
+  local do_exec=0 raw=0
   while [[ $# -gt 0 ]]; do
     case "$1" in
       --exec) do_exec=1; shift;;
-      -h|--help) printf 'usage: handoff takeover <task_id> [--exec]\n'; return 0;;
+      --raw) raw=1; shift;;
+      -h|--help) printf 'usage: handoff takeover <task_id> [--exec] [--raw]\n\nPrints the takeover prompt (default: redacted for safe paste elsewhere).\n--raw skips redaction. --exec launches the backend interactively instead.\n'; return 0;;
       *) die "takeover: unknown arg $1";;
     esac
   done
@@ -430,13 +459,23 @@ verb_takeover() {
 
   "$PY" "$STATE_PY" set --task-dir "$dir" "takeover_at=$(iso_now)" >/dev/null
 
-  if [[ "$do_exec" -eq 0 ]]; then
-    # Print the Headed Takeover Prompt section only.
-    awk '
+  # Helper: extract the "Headed Takeover Prompt" section, redacted by default.
+  emit_takeover_prompt() {
+    local section
+    section="$(awk '
       /^## Headed Takeover Prompt/ {flag=1; next}
       /^## / && flag {exit}
       flag {print}
-    ' "$dir/handoff.md"
+    ' "$dir/handoff.md")"
+    if [[ "$raw" -eq 1 ]]; then
+      printf '%s\n' "$section"
+    else
+      printf '%s\n' "$section" | "$PY" "$STATE_PY" redact
+    fi
+  }
+
+  if [[ "$do_exec" -eq 0 ]]; then
+    emit_takeover_prompt
     return 0
   fi
 
@@ -453,7 +492,7 @@ verb_takeover() {
       if [[ -n "$sid" && "$sid" != "null" ]] && command -v codex >/dev/null 2>&1; then
         exec codex resume "$sid"
       fi
-      awk '/^## Headed Takeover Prompt/{flag=1;next} /^## / && flag{exit} flag{print}' "$dir/handoff.md"
+      emit_takeover_prompt
       ;;
     *) die "unknown backend: $backend";;
   esac
@@ -467,13 +506,23 @@ handoff <verb> [args]
 
 Verbs:
   dispatch --backend {cursor|codex|claude} --task "<prompt>" [--slug <slug>] [--model <id>] [--worktree]
-  list [--json] [--status <s>]
-  status <task_id>
+  list [--json] [--status <s>] [--safe]
+  status <task_id> [--safe]
   cancel <task_id>
   resume <task_id> [--task "<additional>"]
-  takeover <task_id> [--exec]
+  takeover <task_id> [--exec] [--raw]
 
 State lives in <cwd>/.handoffs/<task_id>/state.json
+
+Redaction:
+  takeover output is REDACTED by default (its whole purpose is to paste
+  elsewhere). Add --raw to skip redaction when you trust the context.
+  list/status accept --safe to opt in to redaction for the same reason.
+  Handoff.md on disk stays raw — it's local scratch, not for export.
+
+Pipe redacted output to your clipboard:
+  handoff takeover <id> | pbcopy         # macOS
+  handoff status <id> --safe | pbcopy
 USAGE
 }
 

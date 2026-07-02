@@ -418,6 +418,42 @@ def cmd_reconcile(args: argparse.Namespace) -> int:
     return 0
 
 
+# ---------- redaction --------------------------------------------------------
+#
+# Applied to text before it leaves the skill for external consumption
+# (takeover output, --safe status/list). Keep the ruleset small and
+# high-signal; add patterns here as real leaks are seen.
+
+REDACT_PATTERNS: list[tuple[str, str]] = [
+    # Home directory absolute paths — collapse to $HOME
+    (r"/Users/[A-Za-z0-9._-]+", "$HOME"),
+    (r"/home/[A-Za-z0-9._-]+", "$HOME"),
+    # Common secret-shaped env-var assignments
+    (r"([A-Z][A-Z0-9_]*(?:TOKEN|KEY|SECRET|PASSWORD|PASS|API_KEY|AUTH))=\S+", r"\1=<REDACTED>"),
+    # Provider tokens
+    (r"xox[abpr]-[A-Za-z0-9-]{10,}", "<REDACTED_SLACK>"),
+    (r"AKIA[0-9A-Z]{16}", "<REDACTED_AWS_ACCESS_KEY>"),
+    (r"gh[pousr]_[A-Za-z0-9]{36,}", "<REDACTED_GH_TOKEN>"),
+    (r"sk-(?:proj-|ant-)?[A-Za-z0-9_-]{20,}", "<REDACTED_OPENAI_OR_ANTHROPIC_KEY>"),
+    # Bearer / JWT-shaped
+    (r"Bearer\s+[A-Za-z0-9._~+/-]{16,}", "Bearer <REDACTED>"),
+    # SSH private-key markers
+    (r"-----BEGIN [A-Z ]+PRIVATE KEY-----[\s\S]*?-----END [A-Z ]+PRIVATE KEY-----", "<REDACTED_PRIVATE_KEY>"),
+]
+
+
+def redact(text: str) -> str:
+    for pat, repl in REDACT_PATTERNS:
+        text = re.sub(pat, repl, text)
+    return text
+
+
+def cmd_redact(args: argparse.Namespace) -> int:
+    """Read stdin, print redacted stdout. Used as a bash-side pipe filter."""
+    sys.stdout.write(redact(sys.stdin.read()))
+    return 0
+
+
 def cmd_render(args: argparse.Namespace) -> int:
     task_dir = Path(args.task_dir).resolve()
     state = _load(task_dir / "state.json")
@@ -462,6 +498,9 @@ def main(argv: list[str] | None = None) -> int:
     pd = sub.add_parser("render")
     pd.add_argument("--task-dir", required=True)
     pd.set_defaults(func=cmd_render)
+
+    prd = sub.add_parser("redact", help="Read stdin, write redacted stdout")
+    prd.set_defaults(func=cmd_redact)
 
     args = p.parse_args(argv)
     return args.func(args)
