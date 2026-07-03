@@ -1,0 +1,96 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(find:*)",
+      "Bash(cat:*)",
+      "Bash(grep:*)",
+      "Bash(uuidgen:*)",
+      "WebFetch(domain:fortedle-backend.azurewebsites.net)",
+      "WebSearch",
+      "Skill(find-old-measure)",
+      "Skill(read-from-sql)",
+      "Skill(read-from-fabric)",
+      "Skill(evaluate-dax)",
+      "Skill(evaluate-dax-aas)",
+      "Bash(sqlcmd *-i .claude/skills/read-from-sql/queries/*)",
+      "Bash(sqlcmd *-i .claude/skills/read-from-fabric/queries/*)",
+      "Bash(uv run python .claude/skills/evaluate-dax/run.py *)",
+      "Bash(uv run python .claude/skills/read-from-fabric/get_sql_endpoint.py:*)",
+      "Bash(dotnet run --project .claude/skills/evaluate-dax-aas/AasQuery.csproj *)",
+      "mcp__plugin_serena_serena__read_file",
+      "mcp__plugin_serena_serena__search_for_pattern",
+      "mcp__plugin_serena_serena__find_file",
+      "mcp__plugin_serena_serena__list_dir",
+      "Bash(fab rm:*)"
+    ],
+    "deny": [
+      "Bash(sqlcmd*-Q*)",
+      "Bash(sqlcmd*--query*)",
+      "Bash(*DELETE FROM*)",
+      "Bash(*INSERT INTO*)",
+      "Bash(*UPDATE *SET*)",
+      "Bash(*DROP TABLE*)",
+      "Bash(*DROP DATABASE*)",
+      "Bash(*TRUNCATE*)",
+      "Bash(*ALTER TABLE*)",
+      "Bash(*CREATE TABLE*)",
+      "Bash(*EXEC *)",
+      "Bash(*EXECUTE *)",
+      "Bash(rm:*)",
+      "Bash(rmdir:*)",
+      "Bash(dotnet *--no-mask*)",
+      "Bash(uv run python .claude/skills/evaluate-dax/run.py *--raw*)"
+    ],
+    "defaultMode": "auto"
+  },
+  "model": "claude-fable-5[1m]",
+  "statusLine": {
+    "type": "command",
+    "command": "bash /Users/sten/dev/personal/agent-skills/config/statusline-command.sh"
+  },
+  "enabledPlugins": {
+    "caveman@caveman": true,
+    "tmux-sidebar@local": true,
+    "skill-creator@claude-plugins-official": true,
+    "pyright-lsp@claude-plugins-official": true,
+    "superpowers@claude-plugins-official": true,
+    "codex@openai-codex": true,
+    "frontend-design@claude-plugins-official": true
+  },
+  "extraKnownMarketplaces": {
+    "caveman": {
+      "source": {
+        "source": "github",
+        "repo": "JuliusBrussee/caveman"
+      }
+    },
+    "local": {
+      "source": {
+        "source": "directory",
+        "path": "/Users/sten/.claude-plugins/tmux-sidebar"
+      }
+    },
+    "openai-codex": {
+      "source": {
+        "source": "github",
+        "repo": "openai/codex-plugin-cc"
+      }
+    }
+  },
+  "language": "Norwegian",
+  "effortLevel": "xhigh",
+  "awaySummaryEnabled": false,
+  "tui": "fullscreen",
+  "voice": {
+    "enabled": true,
+    "mode": "hold"
+  },
+  "skipDangerousModePermissionPrompt": true,
+  "skipWorkflowUsageWarning": true,
+  "theme": "auto",
+  "autoCompactEnabled": true,
+  "autoScrollEnabled": true,
+  "agentPushNotifEnabled": true,
+  "skipAutoPermissionPrompt": true,
+  "voiceEnabled": true
+}
