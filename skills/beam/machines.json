@@ -4,6 +4,7 @@
     "matebook": { "ssh": "matebook", "home": "/home/sten" }
   },
   "projects": {
+    "seeyou-agent-build": { "mac": "~/dev/work/seeyou/seeyou-agent-build", "matebook": "~/seeyou-agent-build" },
     "smartmat": { "mac": "~/dev/personal/smartmat", "matebook": "~/openclaw-workspace/smartmat" },
     "fanparks-watcher": { "mac": "~/dev/personal/fanparks-watcher", "matebook": "~/fanparks-watcher" },
     "hitster": { "mac": "~/dev/personal/hitster", "matebook": "~/hitster" }
