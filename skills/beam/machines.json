@@ -1,0 +1,12 @@
+{
+  "machines": {
+    "mac": { "ssh": null, "home": "/Users/sten" },
+    "matebook": { "ssh": "matebook", "home": "/home/sten" }
+  },
+  "projects": {
+    "smartmat": { "mac": "~/dev/personal/smartmat", "matebook": "~/openclaw-workspace/smartmat" },
+    "fanparks-watcher": { "mac": "~/dev/personal/fanparks-watcher", "matebook": "~/fanparks-watcher" },
+    "hitster": { "mac": "~/dev/personal/hitster", "matebook": "~/hitster" }
+  },
+  "fallback": { "mac": "~/dev/personal/{name}", "matebook": "~/{name}" }
+}
