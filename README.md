@@ -2,6 +2,8 @@
 
 Personal skill library for Claude Code (and optionally Codex).
 
+> **Hvordan hele riggen henger sammen (kontoer, maskiner, sync, beam): se [OPPSETT.md](OPPSETT.md).**
+
 - Layout: each skill lives in `skills/<name>/SKILL.md` with YAML frontmatter (`name`, `description`).
 - Discovery: `~/.claude/skills` is a symlink to `./skills` — every Claude Code session reads from here automatically.
 - Scope: personal only. Not tied to any single project. For team-shared skills, use the repo's own `.claude/skills/`.
