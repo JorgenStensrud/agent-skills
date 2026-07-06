@@ -50,7 +50,6 @@
   },
   "enabledPlugins": {
     "caveman@caveman": true,
-    "tmux-sidebar@local": true,
     "skill-creator@claude-plugins-official": true,
     "pyright-lsp@claude-plugins-official": true,
     "superpowers@claude-plugins-official": true,
@@ -69,12 +68,6 @@
       "source": {
         "source": "github",
         "repo": "JuliusBrussee/caveman"
-      }
-    },
-    "local": {
-      "source": {
-        "source": "directory",
-        "path": "/Users/sten/.claude-plugins/tmux-sidebar"
       }
     },
     "openai-codex": {
