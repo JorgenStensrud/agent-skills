@@ -1,0 +1,54 @@
+/* E-ink typography for reMarkable 2: 1404x1872 px @ 226 DPI = 158 x 210 mm.
+   Sized so a rendered page fills the screen with no pinch-zooming.
+   Pure black on white — e-ink has no greys to spare. */
+
+@page { size: 158mm 210mm; margin: 12mm 11mm; }
+
+html { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+
+body {
+  font-family: Georgia, "Iowan Old Style", "Times New Roman", serif;
+  font-size: 12pt;
+  line-height: 1.5;
+  color: #000;
+  background: #fff;
+  hyphens: auto;
+  -webkit-hyphens: auto;
+  margin: 0;
+}
+
+h1 { font-size: 19pt; margin: 0 0 2mm; border-bottom: 2px solid #000; padding-bottom: 2mm; }
+h2 { font-size: 14pt; margin: 7mm 0 2mm; }
+h3 { font-size: 12.5pt; margin: 5mm 0 1.5mm; }
+h1, h2, h3, h4 { page-break-after: avoid; line-height: 1.25; }
+
+p { margin: 0 0 3mm; orphans: 3; widows: 3; }
+
+a { color: #000; text-decoration: underline; }
+
+pre {
+  background: #f0f0f0;
+  border-left: 3px solid #000;
+  padding: 3mm;
+  font-size: 9.5pt;
+  line-height: 1.35;
+  font-family: "SF Mono", Menlo, Consolas, monospace;
+  page-break-inside: avoid;
+  white-space: pre-wrap;
+  overflow-wrap: break-word;
+}
+code { font-family: "SF Mono", Menlo, Consolas, monospace; font-size: 0.9em; }
+pre code { font-size: inherit; }
+
+table { border-collapse: collapse; width: 100%; page-break-inside: avoid; font-size: 10.5pt; margin: 3mm 0; }
+th, td { border: 1px solid #000; padding: 1.8mm 2.5mm; text-align: left; vertical-align: top; }
+th { background: #e8e8e8; font-weight: bold; }
+
+blockquote { border-left: 3px solid #000; margin: 3mm 0; padding-left: 4mm; font-style: italic; }
+
+ul, ol { margin: 0 0 3mm; padding-left: 6mm; }
+li { margin-bottom: 1mm; }
+
+img { max-width: 100%; height: auto; page-break-inside: avoid; }
+
+hr { border: 0; border-top: 1px solid #000; margin: 5mm 0; }
