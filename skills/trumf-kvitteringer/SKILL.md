@@ -34,7 +34,7 @@ gitt, og krever ingen automatisert innlogging.
 
 Be ham bestille den, og stopp der:
 
-> https://www.trumf.no/trumf-profil#/innsyn-og-utlevering → be om utlevering
+> https://www.trumf.no/trumf-profil/innsyn-og-utlevering → be om utlevering
 > (dataportabilitet). Legg filen et sted, og si fra når den er der.
 
 Det tar tid å få den. Ikke vent aktivt.

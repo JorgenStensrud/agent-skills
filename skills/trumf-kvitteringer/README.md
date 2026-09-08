@@ -22,13 +22,53 @@ faktisk har. Innsyn henter resten.
 
 ## Skaff dumpen
 
-1. Logg inn på <https://www.trumf.no/trumf-profil#/innsyn-og-utlevering>
-2. Be om **utlevering (dataportabilitet)** — ikke bare innsyn
-3. Vent. Du får beskjed når filen er klar.
+1. Logg inn på <https://www.trumf.no/trumf-profil/innsyn-og-utlevering>
+2. Be om **utlevering (dataportabilitet)** — **ikke** innsyn
+3. Velg lengst mulig periode. Trumf lagrer kvitteringer i tre år.
+4. Vent. Du får beskjed når filen er klar.
 
-Trumf bekrefter selv at du får dine egne kjøp: *«Digitale kvitteringer er kun
-synlig for den som faktisk har kjøpt varen. Dersom du ber om innsyn eller
-dataportabilitet, får du kun opplysninger om dine egne kjøp.»*
+### Steg 2 er ikke en detalj
+
+MENY, som er samme konsern, sier det rett ut om innsyn:
+
+> «Innsynet vil gi deg tilgang til dine personopplysninger i **PDF-format**.»
+
+PDF kan ikke parses maskinelt. **Utlevering** er noe annet: personvernforordningen
+artikkel 20 krever et «strukturert, vanlig brukt og maskinlesbart format», altså
+JSON eller CSV. Det er det formatet dette verktøyet leser — og det olejorgenb fikk
+i 2019.
+
+Verktøyet oppdager feilen for deg: peker du det på en PDF, eller på en zip som bare
+inneholder PDF, sier det hva som gikk galt og hva du skal be om i stedet.
+
+Trumf bekrefter at du får dine egne kjøp: *«Digitale kvitteringer er kun synlig for
+den som faktisk har kjøpt varen. Dersom du ber om innsyn eller dataportabilitet, får
+du kun opplysninger om dine egne kjøp.»*
+
+### Kan bestillingen automatiseres?
+
+Kort svar: **bestillingen kanskje, leveringen nei — og leveringen er det som avgjør.**
+
+- Bestillingen er **selvbetjent i nettleseren**, ikke en e-post til et personvernombud.
+  Trumf: *«Som innlogget på trumf.no kan du bestille innsyn og styre dine
+  innstillinger.»* MENY: *«Der vil du enkelt og raskt kunne bestille innsyn innenfor
+  ulike områder av persondata, og selv definere hvilken periode du ønsker.»*
+  Siden er en vanlig rute i Trumfs egen webapp (`/trumf-profil/innsyn-og-utlevering`).
+- **Om det ligger ett API-kall bak knappen, vet jeg ikke.** Logikken finnes ikke i
+  noen kodepakke som kan hentes uten å være logget inn — rutenavnet er alt som ligger
+  åpent. Å svare på det krever én innlogget observasjon, og den må du gjøre selv.
+- **Leveringen er asynkron.** Trumf: *«Vi besvarer henvendelsen din så fort som mulig,
+  og senest innen 30 dager.»* Det er ingen nedlastingslenke som dukker opp med det
+  samme.
+
+Derfor: selv om bestillingen lot seg automatisere fullt ut, kan innsyn ikke være en
+jevnlig synkronisering. Det er en **engangs-etterfylling** av dyp historikk. Vil du ha
+noe som kjører ofte, er plattform-API-et veien — se avsnittet om EAN-strekkoder — men
+det gir bare 12 måneder og krever at du kopierer sesjonen fra nettleseren.
+
+Vil du finne ut hva som ligger bak knappen: åpne nettverksfanen før du trykker
+«bestill», og se om det kommer et kall mot `platform-rest-prod.ngdata.no` eller
+`api.ngdata.no`. Det er nok til å avgjøre om et `bestill`-steg kan bygges.
 
 ## Bruk
 

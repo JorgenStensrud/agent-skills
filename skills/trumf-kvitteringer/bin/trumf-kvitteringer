@@ -14,7 +14,7 @@ HVORFOR INNSYN OG IKKE SKRAPING: trumf.no viser 12 måneder, men Trumf lagrer
 kvitteringer i tre år. Innsynsdumpen gir altså mer data enn skraping, uten
 automatisert innlogging i det hele tatt.
 
-  Bestill her:  https://www.trumf.no/trumf-profil#/innsyn-og-utlevering
+  Bestill her:  https://www.trumf.no/trumf-profil/innsyn-og-utlevering
 
 UVERIFISERT: feltnavnene under er hentet fra olejorgenb/trumf_receipt_tools (2019)
 og ttyridal/trumf-data-fetch, ikke fra en dump vi har sett. Derfor gjenkjenner
@@ -90,6 +90,22 @@ def write_private(path: Path, text: str) -> None:
 # Innlesing. Dumpen kan komme som JSON, JSON-linjer eller zip.
 # --------------------------------------------------------------------------
 
+WRONG_REQUEST_HINT = (
+    "Du har trolig bestilt INNSYN i stedet for UTLEVERING (dataportabilitet).\n"
+    "NorgesGruppen leverer innsyn som PDF, som ikke kan parses maskinelt.\n"
+    "Utlevering etter personvernforordningen artikkel 20 skal derimot komme i et\n"
+    "«strukturert, vanlig brukt og maskinlesbart format» — altså JSON eller CSV.\n"
+    "\n"
+    "Gå til https://www.trumf.no/trumf-profil/innsyn-og-utlevering og be om\n"
+    "UTLEVERING / DATAPORTABILITET, ikke innsyn. Velg lengst mulig periode —\n"
+    "Trumf lagrer kvitteringer i tre år."
+)
+
+
+def looks_like_pdf(raw: bytes) -> bool:
+    return raw[:5] == b"%PDF-"
+
+
 def load_any(path: Path):
     if not path.exists():
         raise TrumfError(f"Fant ikke filen: {path}")
@@ -98,6 +114,12 @@ def load_any(path: Path):
         with zipfile.ZipFile(path) as zf:
             members = [n for n in zf.namelist() if n.lower().endswith(".json")]
             if not members:
+                pdfs = [n for n in zf.namelist() if n.lower().endswith(".pdf")]
+                if pdfs:
+                    raise TrumfError(
+                        f"{path} inneholder {len(pdfs)} PDF-filer og ingen JSON.\n\n"
+                        + WRONG_REQUEST_HINT
+                    )
                 raise TrumfError(
                     f"{path} er en zip, men uten JSON-filer i.\n"
                     f"Innhold: {zf.namelist()[:20]}"
@@ -112,6 +134,8 @@ def load_any(path: Path):
 
 
 def parse_bytes(raw: bytes, label: str):
+    if looks_like_pdf(raw):
+        raise TrumfError(f"{label} er en PDF, ikke maskinlesbare data.\n\n" + WRONG_REQUEST_HINT)
     text = raw.decode("utf-8-sig", errors="replace").strip()
     if not text:
         raise TrumfError(f"{label} er tom.")
@@ -426,7 +450,7 @@ def cmd_kvitteringer(args) -> int:
     if not alle:
         raise TrumfError(
             "Ingen kvitteringer importert ennå.\n"
-            "Bestill innsyn på https://www.trumf.no/trumf-profil#/innsyn-og-utlevering "
+            "Bestill innsyn på https://www.trumf.no/trumf-profil/innsyn-og-utlevering "
             "og kjør så:  trumf-kvitteringer importer <fil>"
         )
     valgt = filtrer(alle, args)
