@@ -4,3 +4,45 @@
 __pycache__/
 *.pyc
 skills/remarkable/bin/
+
+# ---------------------------------------------------------------------------
+# Secrets and session state — must never enter the repo.
+#
+# This repo is private today but should be publishable later, and making a
+# repo public exposes the whole git history, not just the current tree.
+# A secret committed while private is still in the history the day it goes
+# public, and deleting the file afterwards does not remove it — only a
+# history rewrite does, and by then the secret must be rotated anyway.
+#
+# So: credentials live outside the repo (~/.config/<skill>/), and these
+# patterns are the second line of defence against the accident, not a
+# cleanup step. See AUTH.md.
+# ---------------------------------------------------------------------------
+.env
+.env.*
+!.env.example
+!.env.sample
+!.env.template
+*.secret
+secrets.*
+credentials
+credentials.*
+session.json
+*.session.json
+cookies.json
+*.cookies.json
+token.json
+*.token.json
+*.pem
+*.key
+*.p12
+*.pfx
+
+# Fetched personal data — receipts, orders, exports. Also never in the repo.
+data/
+out/
+*.receipts.json
+*.kvitteringer.json
+*.orders.json
+*.ordrer.json
+innsyn/
