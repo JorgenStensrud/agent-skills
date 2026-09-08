@@ -1,5 +1,13 @@
 #!/usr/bin/env bash
-# Pre-commit hook: run scripts/validate-skills before allowing a commit.
+# Pre-commit hook: guard the repo before allowing a commit.
+#
+#   1. scripts/scan-secrets   — no credentials or personal data in the commit
+#   2. scripts/validate-skills — skill frontmatter is well-formed
+#
+# The secret scan runs first and on purpose: a bad skill description is a
+# nuisance you fix in the next commit, but a committed secret is in the
+# history for good. This repo should be publishable later, and going public
+# exposes the whole history — not just the current tree. See AUTH.md.
 #
 # Install: from repo root:
 #   ln -sf ../../hooks/pre-commit .git/hooks/pre-commit
@@ -8,8 +16,18 @@
 set -euo pipefail
 
 REPO="$(git rev-parse --show-toplevel)"
+
+"$REPO/scripts/scan-secrets" || {
+  cat >&2 <<'EOF'
+
+Commit blocked by hooks/pre-commit — see the findings above.
+Bypass (rarely, and never for a real secret): git commit --no-verify
+EOF
+  exit 1
+}
+
 "$REPO/scripts/validate-skills" || {
-  cat >&2 <<EOF
+  cat >&2 <<'EOF'
 
 Commit blocked by hooks/pre-commit — fix the errors above and re-stage.
 Bypass (rarely): git commit --no-verify
