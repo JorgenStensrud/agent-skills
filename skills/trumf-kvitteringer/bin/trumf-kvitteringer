@@ -1,0 +1,538 @@
+#!/usr/bin/env python3
+"""trumf-kvitteringer — les innsynsdumpen fra Trumf og gjør den om til noe brukbart.
+
+Dette er en PARSER, ikke en skraper. Ingen innlogging, ingen nettverkskall, ingen
+legitimasjon. Du bestiller dataene dine selv på trumf.no og peker verktøyet på filen.
+
+  trumf-kvitteringer inspiser <fil>     hva ER dette? struktur uten verdier
+  trumf-kvitteringer importer <fil>     parse og lagre normaliserte kvitteringer
+  trumf-kvitteringer kvitteringer       list det som er importert
+  trumf-kvitteringer varer              summer per vare
+  trumf-kvitteringer status             hva ligger på disk
+
+HVORFOR INNSYN OG IKKE SKRAPING: trumf.no viser 12 måneder, men Trumf lagrer
+kvitteringer i tre år. Innsynsdumpen gir altså mer data enn skraping, uten
+automatisert innlogging i det hele tatt.
+
+  Bestill her:  https://www.trumf.no/trumf-profil#/innsyn-og-utlevering
+
+UVERIFISERT: feltnavnene under er hentet fra olejorgenb/trumf_receipt_tools (2019)
+og ttyridal/trumf-data-fetch, ikke fra en dump vi har sett. Derfor gjenkjenner
+parseren flere navn per felt, og `inspiser` finnes for å avdekke formen uten at du
+må dele innholdet med noen.
+"""
+from __future__ import annotations
+
+import argparse
+import hashlib
+import json
+import os
+import re
+import sys
+import zipfile
+from datetime import datetime
+from pathlib import Path
+
+# --------------------------------------------------------------------------
+# Feltnavn vi kjenner igjen. Innsynsdumpen (2019) og plattform-API-et bruker
+# ulike navn på det samme, og begge kan dukke opp.
+# --------------------------------------------------------------------------
+
+LINES_KEYS = ("varelinjer", "varer", "linjer", "items", "lines")
+DATE_KEYS = ("dato", "kjopsdato", "kjøpsdato", "transaksjonsdato", "date", "datetime")
+RECEIPT_ID_KEYS = ("kvitteringsnummer", "batchid", "batchId", "transaksjonsid",
+                   "kvitteringsid", "id")
+CHAIN_KEYS = ("kjede", "kjedenavn", "kjedeId", "kjedeid", "chain")
+STORE_KEYS = ("butikknavn", "butikk", "butikkNavn", "beskrivelse", "storeName", "sted")
+TOTAL_KEYS = ("belop", "beløp", "totalbelop", "totalBelop", "sum", "totalsum")
+BONUS_KEYS = ("trumf", "trumftotal", "bonus", "trumfbonus")
+
+LINE_NAME_KEYS = ("varenavn", "vareTekst", "varetekst", "navn", "produktnavn", "tekst")
+LINE_QTY_KEYS = ("vareAntallVekt", "antall", "vareAntall", "kvantum", "mengde")
+LINE_AMOUNT_KEYS = ("vareBelop", "vareBeløp", "belop", "beløp", "sum", "pris", "linjebelop")
+LINE_EAN_KEYS = ("ean", "EAN", "gtin", "strekkode", "varenummer")
+
+KNOWN_LINE_KEYS = set(LINE_NAME_KEYS + LINE_QTY_KEYS + LINE_AMOUNT_KEYS + LINE_EAN_KEYS)
+
+DATE_FORMATS = ("%d.%m.%Y %H:%M:%S", "%d.%m.%Y %H:%M", "%d.%m.%Y",
+                "%Y-%m-%dT%H:%M:%S", "%Y-%m-%d %H:%M:%S", "%Y-%m-%d")
+
+
+class TrumfError(Exception):
+    """Feil vi kan forklare."""
+
+
+# --------------------------------------------------------------------------
+# Stier
+# --------------------------------------------------------------------------
+
+def data_dir() -> Path:
+    env = os.environ.get("TRUMF_KVITTERINGER_DATA_DIR")
+    if env:
+        return Path(env).expanduser()
+    base = os.environ.get("XDG_DATA_HOME") or (Path.home() / ".local" / "share")
+    return Path(base).expanduser() / "trumf-kvitteringer"
+
+
+def receipts_dir() -> Path:
+    return data_dir() / "kvitteringer"
+
+
+def write_private(path: Path, text: str) -> None:
+    path.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
+    fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+    with os.fdopen(fd, "w", encoding="utf-8") as fh:
+        fh.write(text)
+    os.chmod(path, 0o600)
+
+
+# --------------------------------------------------------------------------
+# Innlesing. Dumpen kan komme som JSON, JSON-linjer eller zip.
+# --------------------------------------------------------------------------
+
+def load_any(path: Path):
+    if not path.exists():
+        raise TrumfError(f"Fant ikke filen: {path}")
+
+    if zipfile.is_zipfile(path):
+        with zipfile.ZipFile(path) as zf:
+            members = [n for n in zf.namelist() if n.lower().endswith(".json")]
+            if not members:
+                raise TrumfError(
+                    f"{path} er en zip, men uten JSON-filer i.\n"
+                    f"Innhold: {zf.namelist()[:20]}"
+                )
+            docs = []
+            for name in members:
+                with zf.open(name) as fh:
+                    docs.append(parse_bytes(fh.read(), f"{path}!{name}"))
+            return docs[0] if len(docs) == 1 else docs
+
+    return parse_bytes(path.read_bytes(), str(path))
+
+
+def parse_bytes(raw: bytes, label: str):
+    text = raw.decode("utf-8-sig", errors="replace").strip()
+    if not text:
+        raise TrumfError(f"{label} er tom.")
+    try:
+        return json.loads(text)
+    except json.JSONDecodeError:
+        pass
+    # JSON-linjer?
+    rows, bad = [], 0
+    for line in text.splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            rows.append(json.loads(line))
+        except json.JSONDecodeError:
+            bad += 1
+    if rows and bad == 0:
+        return rows
+    raise TrumfError(
+        f"{label} er verken gyldig JSON eller JSON-linjer.\n"
+        f"Første 200 tegn: {text[:200]!r}\n"
+        "Er dette en CSV eller PDF? Da trenger parseren en oppdatering — "
+        "kjør 'inspiser' på filen og del strukturen."
+    )
+
+
+# --------------------------------------------------------------------------
+# Finn kvitteringene i dokumentet, uansett hvor de er pakket inn
+# --------------------------------------------------------------------------
+
+def looks_like_receipt(d) -> bool:
+    return isinstance(d, dict) and any(
+        isinstance(d.get(k), list) for k in LINES_KEYS
+    )
+
+
+def find_receipts(doc, _depth: int = 0):
+    """Innsynsdumpen kan være en bar liste, eller pakket inn i et objekt med
+    metadata rundt. Let etter den første listen som ser ut som kvitteringer."""
+    if _depth > 6:
+        return []
+    if isinstance(doc, list):
+        hits = [d for d in doc if looks_like_receipt(d)]
+        if hits:
+            return hits
+        for item in doc:
+            found = find_receipts(item, _depth + 1)
+            if found:
+                return found
+        return []
+    if isinstance(doc, dict):
+        if looks_like_receipt(doc):
+            return [doc]
+        for value in doc.values():
+            found = find_receipts(value, _depth + 1)
+            if found:
+                return found
+    return []
+
+
+# --------------------------------------------------------------------------
+# Verdikonvertering
+# --------------------------------------------------------------------------
+
+def pick(d: dict, keys, default=None):
+    for k in keys:
+        if isinstance(d, dict) and d.get(k) not in (None, ""):
+            return d[k]
+    return default
+
+
+def to_number(value):
+    """Innsynsdumpen bruker norsk desimalkomma ('41,60'); plattform-API-et
+    bruker punktum ('29.90'). Siste separator vinner som desimalskille."""
+    if value is None or value == "":
+        return None
+    if isinstance(value, (int, float)):
+        return float(value)
+    s = str(value).replace(" ", "").replace(" ", "").strip()
+    s = re.sub(r"[^0-9,.\-]", "", s)
+    if not s:
+        return None
+    last_comma, last_dot = s.rfind(","), s.rfind(".")
+    if last_comma > last_dot:
+        s = s.replace(".", "").replace(",", ".")
+    elif last_dot > last_comma:
+        s = s.replace(",", "")
+    else:
+        s = s.replace(",", ".")
+    try:
+        return float(s)
+    except ValueError:
+        return None
+
+
+def to_date(value):
+    """Returnerer (iso_dato, original) — original beholdes når vi ikke forstår."""
+    if value is None or value == "":
+        return None, None
+    s = str(value).strip()
+    for fmt in DATE_FORMATS:
+        try:
+            return datetime.strptime(s, fmt).date().isoformat(), s
+        except ValueError:
+            continue
+    return None, s
+
+
+# --------------------------------------------------------------------------
+# Normalisering
+# --------------------------------------------------------------------------
+
+def normalize_receipt(raw: dict) -> dict:
+    lines_raw = None
+    for k in LINES_KEYS:
+        if isinstance(raw.get(k), list):
+            lines_raw = raw[k]
+            break
+    if lines_raw is None:
+        raise TrumfError(f"Kvittering uten varelinjer. Nøkler: {sorted(raw.keys())}")
+
+    iso, original = to_date(pick(raw, DATE_KEYS))
+    ukjente: set[str] = set()
+    linjer = []
+
+    for line in lines_raw:
+        if not isinstance(line, dict):
+            continue
+        linjer.append({
+            "varenavn": pick(line, LINE_NAME_KEYS),
+            "antall": to_number(pick(line, LINE_QTY_KEYS)),
+            "belop": to_number(pick(line, LINE_AMOUNT_KEYS)),
+            "ean": pick(line, LINE_EAN_KEYS),
+        })
+        ukjente |= {k for k in line.keys() if k not in KNOWN_LINE_KEYS}
+
+    kvitteringsnummer = pick(raw, RECEIPT_ID_KEYS)
+    if kvitteringsnummer is None:
+        # Uten id lager vi en stabil en av innholdet, så gjentatt import ikke
+        # dupliserer den samme kvitteringen.
+        seed = json.dumps(raw, sort_keys=True, ensure_ascii=False)
+        kvitteringsnummer = "auto-" + hashlib.sha256(seed.encode()).hexdigest()[:16]
+
+    total = to_number(pick(raw, TOTAL_KEYS))
+    sum_linjer = sum(l["belop"] for l in linjer if l["belop"] is not None) or None
+
+    ut = {
+        "kvitteringsnummer": str(kvitteringsnummer),
+        "dato": iso,
+        "kjede": pick(raw, CHAIN_KEYS),
+        "butikknavn": pick(raw, STORE_KEYS),
+        "totalbelop": total,
+        "bonus": to_number(pick(raw, BONUS_KEYS)),
+        "varelinjer": linjer,
+        "_meta": {
+            "antall_varelinjer": len(linjer),
+            "sum_varelinjer": round(sum_linjer, 2) if sum_linjer is not None else None,
+            "ukjente_varelinjefelter": sorted(ukjente),
+            "ukjente_kvitteringsfelter": sorted(
+                k for k in raw.keys()
+                if k not in set(LINES_KEYS + DATE_KEYS + RECEIPT_ID_KEYS + CHAIN_KEYS
+                                + STORE_KEYS + TOTAL_KEYS + BONUS_KEYS)
+            ),
+        },
+    }
+
+    if iso is None and original is not None:
+        ut["_meta"]["dato_uforstaatt"] = original
+    # Avstemming: summen av linjene mot totalen fanger opp at parsingen mistet noe.
+    if total is not None and sum_linjer is not None and abs(total - sum_linjer) > 0.05:
+        ut["_meta"]["advarsel_sum"] = (
+            f"Varelinjene summerer til {sum_linjer:.2f}, men kvitteringen sier "
+            f"{total:.2f}. Rabatt, pant eller et felt vi ikke leser."
+        )
+    return ut
+
+
+# --------------------------------------------------------------------------
+# Kommandoer
+# --------------------------------------------------------------------------
+
+def skeleton(value, depth: int = 0):
+    """Struktur UTEN verdier — bare navn, typer og antall. Trygg å dele."""
+    if depth > 5:
+        return "..."
+    if isinstance(value, dict):
+        return {k: skeleton(v, depth + 1) for k, v in list(value.items())[:40]}
+    if isinstance(value, list):
+        if not value:
+            return ["<tom liste>"]
+        return [skeleton(value[0], depth + 1), f"... {len(value)} elementer"]
+    if isinstance(value, bool):
+        return "<bool>"
+    if isinstance(value, (int, float)):
+        return "<tall>"
+    if value is None:
+        return "<null>"
+    s = str(value)
+    if re.fullmatch(r"\d{2}\.\d{2}\.\d{4}([ T]\d{2}:\d{2}(:\d{2})?)?", s) or \
+       re.fullmatch(r"\d{4}-\d{2}-\d{2}.*", s):
+        return "<dato-lignende tekst>"
+    return f"<tekst, {len(s)} tegn>"
+
+
+def cmd_inspiser(args) -> int:
+    doc = load_any(Path(args.fil))
+    receipts = find_receipts(doc)
+    rapport = {
+        "fil": str(args.fil),
+        "toppnivaa": type(doc).__name__,
+        "toppnokler": sorted(doc.keys())[:40] if isinstance(doc, dict) else None,
+        "kvitteringer_funnet": len(receipts),
+        "struktur_uten_verdier": skeleton(receipts[0]) if receipts else skeleton(doc),
+        "merk": "Denne rapporten inneholder ingen verdier - bare feltnavn, typer og "
+                "antall. Den er trygg å dele hvis parseren trenger en oppdatering.",
+    }
+    if receipts:
+        first = receipts[0]
+        rapport["gjenkjente_felter"] = {
+            "dato": next((k for k in DATE_KEYS if k in first), None),
+            "kvitteringsnummer": next((k for k in RECEIPT_ID_KEYS if k in first), None),
+            "kjede": next((k for k in CHAIN_KEYS if k in first), None),
+            "butikknavn": next((k for k in STORE_KEYS if k in first), None),
+            "varelinjer": next((k for k in LINES_KEYS if isinstance(first.get(k), list)), None),
+        }
+    else:
+        rapport["advarsel"] = (
+            "Fant ingen kvitteringer. Parseren leter etter objekter med en liste "
+            f"under en av {list(LINES_KEYS)}. Del 'struktur_uten_verdier' over — "
+            "den inneholder ingen persondata."
+        )
+    print(json.dumps(rapport, ensure_ascii=False, indent=2))
+    return 0 if receipts else 1
+
+
+def cmd_importer(args) -> int:
+    doc = load_any(Path(args.fil))
+    receipts = find_receipts(doc)
+    if not receipts:
+        raise TrumfError(
+            f"Fant ingen kvitteringer i {args.fil}.\n"
+            "Kjør 'trumf-kvitteringer inspiser <fil>' — den viser strukturen uten "
+            "verdier, så den kan deles for å få parseren oppdatert."
+        )
+
+    out_dir = receipts_dir()
+    out_dir.mkdir(mode=0o700, parents=True, exist_ok=True)
+
+    nye, oppdatert, feilet = [], [], []
+    for raw in receipts:
+        try:
+            norm = normalize_receipt(raw)
+        except TrumfError as e:
+            feilet.append(str(e))
+            continue
+        safe = re.sub(r"[^A-Za-z0-9_.-]", "_", norm["kvitteringsnummer"])
+        target = out_dir / f"{safe}.json"
+        (oppdatert if target.exists() else nye).append(norm["kvitteringsnummer"])
+        write_private(target, json.dumps(norm, ensure_ascii=False, indent=2) + "\n")
+
+    alle = les_kvitteringer()
+    uten_dato = [k["kvitteringsnummer"] for k in alle if not k.get("dato")]
+    resultat = {
+        "importert": len(nye) + len(oppdatert),
+        "nye": len(nye),
+        "oppdatert": len(oppdatert),
+        "feilet": len(feilet),
+        "mappe": str(out_dir),
+    }
+    if feilet:
+        resultat["feil"] = feilet[:10]
+    if uten_dato:
+        resultat["advarsel_dato"] = (
+            f"{len(uten_dato)} kvitteringer fikk ingen forstått dato. "
+            "Se _meta.dato_uforstaatt i filene og legg formatet til i DATE_FORMATS."
+        )
+    print(json.dumps(resultat, ensure_ascii=False, indent=2))
+    return 1 if feilet else 0
+
+
+def les_kvitteringer() -> list[dict]:
+    d = receipts_dir()
+    if not d.is_dir():
+        return []
+    ut = []
+    for p in sorted(d.glob("*.json")):
+        try:
+            ut.append(json.loads(p.read_text(encoding="utf-8")))
+        except (OSError, json.JSONDecodeError):
+            continue
+    return ut
+
+
+def filtrer(kvitteringer, args):
+    ut = []
+    for k in kvitteringer:
+        dato = k.get("dato")
+        if args.fra and (dato is None or dato < args.fra):
+            continue
+        if args.til and (dato is None or dato > args.til):
+            continue
+        if args.kjede and (k.get("kjede") or "").lower() != args.kjede.lower():
+            continue
+        ut.append(k)
+    return sorted(ut, key=lambda k: (k.get("dato") or "", k["kvitteringsnummer"]),
+                  reverse=True)
+
+
+def cmd_kvitteringer(args) -> int:
+    alle = les_kvitteringer()
+    if not alle:
+        raise TrumfError(
+            "Ingen kvitteringer importert ennå.\n"
+            "Bestill innsyn på https://www.trumf.no/trumf-profil#/innsyn-og-utlevering "
+            "og kjør så:  trumf-kvitteringer importer <fil>"
+        )
+    valgt = filtrer(alle, args)
+    if args.med_varelinjer:
+        print(json.dumps(valgt, ensure_ascii=False, indent=2))
+    else:
+        print(json.dumps([{k: v for k, v in kv.items()
+                           if k not in ("varelinjer", "_meta")} for kv in valgt],
+                         ensure_ascii=False, indent=2))
+    return 0
+
+
+def cmd_varer(args) -> int:
+    alle = les_kvitteringer()
+    if not alle:
+        raise TrumfError("Ingen kvitteringer importert ennå.")
+    agg: dict[str, dict] = {}
+    for kv in filtrer(alle, args):
+        for linje in kv.get("varelinjer") or []:
+            navn = linje.get("varenavn")
+            if not navn:
+                continue
+            key = str(navn).strip().lower()
+            rad = agg.setdefault(key, {
+                "varenavn": navn, "ean": linje.get("ean"),
+                "ganger_kjopt": 0, "sum_antall": 0.0, "sum_belop": 0.0,
+            })
+            rad["ganger_kjopt"] += 1
+            rad["sum_antall"] += linje.get("antall") or 0
+            rad["sum_belop"] += linje.get("belop") or 0
+            if not rad["ean"] and linje.get("ean"):
+                rad["ean"] = linje["ean"]
+    rader = sorted(agg.values(), key=lambda r: -r["sum_belop"])
+    for r in rader:
+        r["sum_antall"] = round(r["sum_antall"], 3)
+        r["sum_belop"] = round(r["sum_belop"], 2)
+    print(json.dumps(rader[:args.limit] if args.limit else rader,
+                     ensure_ascii=False, indent=2))
+    return 0
+
+
+def cmd_status(args) -> int:
+    alle = les_kvitteringer()
+    datoer = sorted(k["dato"] for k in alle if k.get("dato"))
+    print(json.dumps({
+        "kvitteringer": len(alle),
+        "tidligste": datoer[0] if datoer else None,
+        "seneste": datoer[-1] if datoer else None,
+        "uten_dato": sum(1 for k in alle if not k.get("dato")),
+        "kjeder": sorted({k["kjede"] for k in alle if k.get("kjede")}),
+        "mappe": str(receipts_dir()),
+    }, ensure_ascii=False, indent=2))
+    return 0
+
+
+# --------------------------------------------------------------------------
+
+def add_filters(p):
+    p.add_argument("--fra", help="Tidligste dato, YYYY-MM-DD")
+    p.add_argument("--til", help="Seneste dato, YYYY-MM-DD")
+    p.add_argument("--kjede", help="Bare denne kjeden, f.eks. KIWI")
+
+
+def build_parser() -> argparse.ArgumentParser:
+    ap = argparse.ArgumentParser(
+        prog="trumf-kvitteringer",
+        description="Les innsynsdumpen fra Trumf. Parser, ikke skraper — "
+                    "ingen innlogging og ingen nettverkskall.",
+    )
+    sub = ap.add_subparsers(dest="kommando", required=True)
+
+    p = sub.add_parser("inspiser", help="Vis strukturen i en dump uten å vise verdier")
+    p.add_argument("fil")
+    p.set_defaults(func=cmd_inspiser)
+
+    p = sub.add_parser("importer", help="Parse en dump og lagre normaliserte kvitteringer")
+    p.add_argument("fil")
+    p.set_defaults(func=cmd_importer)
+
+    p = sub.add_parser("kvitteringer", help="List importerte kvitteringer")
+    add_filters(p)
+    p.add_argument("--med-varelinjer", action="store_true")
+    p.set_defaults(func=cmd_kvitteringer)
+
+    p = sub.add_parser("varer", help="Summer per vare, dyreste først")
+    add_filters(p)
+    p.add_argument("--limit", type=int)
+    p.set_defaults(func=cmd_varer)
+
+    p = sub.add_parser("status", help="Hva ligger på disk")
+    p.set_defaults(func=cmd_status)
+
+    return ap
+
+
+def main(argv=None) -> int:
+    args = build_parser().parse_args(argv)
+    try:
+        return args.func(args)
+    except TrumfError as e:
+        print(f"trumf-kvitteringer: {e}", file=sys.stderr)
+        return 2
+    except KeyboardInterrupt:
+        print("avbrutt", file=sys.stderr)
+        return 130
+
+
+if __name__ == "__main__":
+    sys.exit(main())
