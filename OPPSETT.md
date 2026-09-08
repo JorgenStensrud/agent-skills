@@ -2,6 +2,10 @@
 
 Én kilde til sannhet: **dette repoet**. Alt annet er symlinker inn hit.
 
+Unntaket er skills som har fått eget repo — i dag `oda-kvitteringer` og `trumf-kvitteringer`
+i [`digital-kjoleskap`](https://github.com/JorgenStensrud/digital-kjoleskap). De symlinkes
+inn i `skills/` herfra og oppfører seg ellers likt; se README-en der for kommandoen.
+
 ```
                     agent-skills (dette repoet)
                     ├── skills/          ← alle skills

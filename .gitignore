@@ -5,6 +5,12 @@ __pycache__/
 *.pyc
 skills/remarkable/bin/
 
+# Skills that live in another repo and are symlinked in here. The symlink is
+# made once per machine (see digital-kjoleskap/README.md) and is deliberately
+# not committed: it assumes that repo is cloned next to this one.
+skills/oda-kvitteringer
+skills/trumf-kvitteringer
+
 # ---------------------------------------------------------------------------
 # Secrets and session state — must never enter the repo.
 #

@@ -6,6 +6,11 @@ det gjøres slik at koden kan ligge offentlig uten at hemmeligheter følger med.
 `README.md` dekker det mekaniske ved en skill. `OPPSETT.md` dekker riggen. Dette dokumentet
 dekker det som gjenstår: pålogging.
 
+> `oda-kvitteringer` og `trumf-kvitteringer` bor ikke lenger her — de er flyttet til
+> [`digital-kjoleskap`](https://github.com/JorgenStensrud/digital-kjoleskap), som har sin
+> egen `AUTH.md` med den delen av denne oppskriften som gjelder dem. De står fortsatt som
+> presedens under, fordi de er de eneste utbygde eksemplene på to av mønstrene.
+
 > Filnavnet er `AUTH.md` og ikke `PÅLOGGING.md` med vilje. macOS lagrer `å` i filnavn
 > annerledes enn Linux (NFD mot NFC), og et repo som synkes mellom Mac og matebook får da
 > filen til å se endret ut på begge maskiner samtidig. Æ, ø og å hører hjemme i innholdet,
@@ -171,8 +176,8 @@ utviklerverktøy og limer den inn.
 - **I drift:** tokenet fornyes stille så lenge sesjonskapselen lever. Har tjenesten en
   langlevd innloggingskapsel på identitetsdomenet, kan verktøyet dessuten følge
   OAuth-omdirigeringene og skaffe seg en helt ny sesjon uten at brukeren merker noe.
-- **Presedens her:** `trumf-kvitteringer`. Trumf har SMS-tofaktor, så (b) er utelukket —
-  men innlimingen trengs likevel bare én gang per maskin.
+- **Presedens:** `trumf-kvitteringer`, nå i `digital-kjoleskap`. Trumf har SMS-tofaktor, så
+  (b) er utelukket — men innlimingen trengs likevel bare én gang per maskin.
 - **Bruk til:** tjenester der innloggingen må skje i nettleseren, men resten kan
   automatiseres. Det er de fleste av dem.
 
@@ -186,7 +191,7 @@ informasjonskapselen.
 - **Passordet tas inn på stdin, aldri som argument.** Argumenter lekker til `ps` og
   skallhistorikk.
 
-Dette er mønsteret `oda-kvitteringer` bruker.
+Dette er mønsteret `oda-kvitteringer` bruker, nå i `digital-kjoleskap`.
 
 ### Enhetskoblet token
 
