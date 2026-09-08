@@ -164,6 +164,18 @@ utviklerverktøy og limer den inn.
 - Dør når sesjonen dør, uten mulighet for fornying.
 - **Bruk til:** engangsuttrekk og utforskning. For dårlig ergonomi til noe som kjøres jevnlig.
 
+**(a2) Kopiert én gang, deretter selvfornyende.** Samme innliming, men verktøyet lagrer
+*sesjonskapslene* og bytter dem inn i et ferskt tilgangstoken ved hvert kall.
+
+- **Første gang:** som (a) — lim inn fra utviklerverktøyene.
+- **I drift:** tokenet fornyes stille så lenge sesjonskapselen lever. Har tjenesten en
+  langlevd innloggingskapsel på identitetsdomenet, kan verktøyet dessuten følge
+  OAuth-omdirigeringene og skaffe seg en helt ny sesjon uten at brukeren merker noe.
+- **Presedens her:** `trumf-kvitteringer`. Trumf har SMS-tofaktor, så (b) er utelukket —
+  men innlimingen trengs likevel bare én gang per maskin.
+- **Bruk til:** tjenester der innloggingen må skje i nettleseren, men resten kan
+  automatiseres. Det er de fleste av dem.
+
 **(b) Verktøyet logger inn selv** mot tjenestens innloggingsendepunkt og tar vare på
 informasjonskapselen.
 
@@ -284,8 +296,18 @@ selvbetjent eksport. **Vurder alltid den veien først** — ikke av forsiktighet
 ofte gir *mer* data for *mindre* arbeid.
 
 Konkret eksempel: Trumf viser 12 måneder på nettsidene, men lagrer kvitteringer i tre år.
-Innsynsdumpen gir altså tre ganger så mye, uten noen automatisert innlogging i det hele tatt.
-`trumf-kvitteringer` er derfor en parser, ikke en skraper.
+Innsynsdumpen gir altså tre ganger så mye. `trumf-kvitteringer` velger derfor innsynsveien
+framfor å skrape kvitteringssidene.
+
+Og merk hvor lett det er å ta feil om hva som må gjøres for hånd: skillen ble først levert som
+en ren parser, fordi bestillingen så ut som et skjema du måtte klikke deg gjennom. Det var den
+ikke — skjemaet sender en helt vanlig `POST` som et hvilket som helst verktøy kan sende. **Se
+etter kallet i nettverksfanen før du konkluderer med at noe er manuelt.** Hele forskjellen
+mellom «be brukeren gjøre det» og «gjør det» kan ligge der.
+
+Ventetiden forsvinner ikke av at bestillingen automatiseres — Trumf har inntil 30 dager på
+seg. Et verktøy for en asynkron rettighet må derfor **huske at det har bestilt** og kunne
+svare på «er den klar?» dager senere, ikke vente aktivt i en løkke.
 
 Motsatt for Oda: ingen selvbetjent eksport, bare en manuell forespørsel til `privacy@oda.com`
 per gang. Det duger til et engangsuttrekk, ikke til noe som kjøres jevnlig — og Oda har
