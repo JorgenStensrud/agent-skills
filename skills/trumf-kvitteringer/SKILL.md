@@ -28,14 +28,18 @@ Det er et bevisst valg, ikke en begrensning: trumf.no viser 12 måneder, mens Tr
 lagrer kvitteringer i **tre år**. Innsynsdumpen gir altså mer data enn skraping ville
 gitt, og krever ingen automatisert innlogging.
 
-**Ikke foreslå å automatisere bestillingen.** Den er manuell med vilje.
+Bestillingen er selvbetjent i nettleseren, men **leveringen er asynkron** — Trumf
+svarer «senest innen 30 dager». Innsyn er derfor en engangs-etterfylling av dyp
+historikk, ikke noe som kan kjøre jevnlig, uansett hvor mye av bestillingen som
+lot seg automatisere. Se README for hva som er avklart og hva som ikke er.
 
 ## Har brukeren ingen dump ennå
 
 Be ham bestille den, og stopp der:
 
-> https://www.trumf.no/trumf-profil/innsyn-og-utlevering → be om utlevering
-> (dataportabilitet). Legg filen et sted, og si fra når den er der.
+> https://www.trumf.no/trumf-profil/innsyn-og-utlevering → be om **utlevering
+> (dataportabilitet)**, ikke innsyn. Innsyn leveres som PDF og kan ikke leses
+> maskinelt. Velg lengst mulig periode. Si fra når filen er der.
 
 Det tar tid å få den. Ikke vent aktivt.
 
