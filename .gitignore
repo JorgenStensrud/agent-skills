@@ -12,8 +12,9 @@ skills/oda-kvitteringer
 skills/trumf-kvitteringer
 skills/kjoleskap
 
-# impeccable laster ned sin egen binær (16 MB) ved første kjøring; den hører ikke i git.
-skills/impeccable/scripts/bin/
+# impeccable er en tredjeparts skill som installeres for seg (med egen binær på 16 MB);
+# den ligger lokalt under skills/, men hører ikke i dette repoet.
+skills/impeccable/
 
 # ---------------------------------------------------------------------------
 # Secrets and session state — must never enter the repo.
