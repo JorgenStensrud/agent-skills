@@ -26,9 +26,9 @@ scripts/scan-secrets                                             # staged filer
 python3 skills/trumf-kvitteringer/tests/test_trumf_kvitteringer.py
 ```
 
-`validate-skills` melder tre feil på Linux (`create-cli`, `github-deep-review`,
-`skill-cleaner` er symlinker til `/Users/sten/...`). De er forventet på en ikke-Mac-maskin
-og har ingenting med endringene dine å gjøre.
+`validate-skills` melder tre advarsler på Linux (`create-cli`, `github-deep-review`,
+`skill-cleaner` er symlinker til `/Users/sten/...`). De er forventet på en ikke-Mac-maskin,
+stopper ikke en commit, og har ingenting med endringene dine å gjøre.
 
 ## Sjekk om noe faktisk er manuelt
 

@@ -95,6 +95,11 @@ def check_skill(skill_dir: Path) -> tuple[list[str], list[str]]:
 
     skill_md = skill_dir / "SKILL.md"
     if not skill_md.exists():
+        # En symlenke til en annen maskins hjem (/Users/… på Mac) kan ikke løses her.
+        # Det er forventet på Linux og skal ikke stoppe en commit — bare advares.
+        if skill_dir.is_symlink() and os.readlink(skill_dir).startswith("/Users/") and sys.platform != "darwin":
+            warns.append(f"{prefix} symlink to a macOS path ({os.readlink(skill_dir)}); skipped on {sys.platform}")
+            return errs, warns
         errs.append(f"{prefix}SKILL.md missing")
         return errs, warns
 

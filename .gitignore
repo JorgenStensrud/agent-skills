@@ -10,6 +10,10 @@ skills/remarkable/bin/
 # not committed: it assumes that repo is cloned next to this one.
 skills/oda-kvitteringer
 skills/trumf-kvitteringer
+skills/kjoleskap
+
+# impeccable laster ned sin egen binær (16 MB) ved første kjøring; den hører ikke i git.
+skills/impeccable/scripts/bin/
 
 # ---------------------------------------------------------------------------
 # Secrets and session state — must never enter the repo.
