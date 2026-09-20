@@ -118,7 +118,21 @@ export function avgjor({ skall, server, swVedLast, swNaa }) {
   ```
 
   Nødutgangen ligger i den *nye* koden, så den redder ikke telefonen som alt står
-  fast — den hindrer neste gang. Én fastlåst telefon må gjøre det for hånd.
+  fast. Til den trengs en vei **utenfra**: en `/nullstill`-side servert av serveren,
+  utenfor skallet og med `Cache-Control: no-store`, som avregistrerer alle service
+  workers, sletter alle cacher og lenker tilbake til appen. Den virker fordi en ukjent
+  sti ikke finnes i cachen og derfor hentes fra nettet selv når service workeren
+  styrer alt annet. La den nye service workeren også slippe `/nullstill` forbi.
+- **`max-age=0` er ikke nok på iOS.** Serverer du `/` og `/sw.js` med `max-age=0`
+  (Express' standard for statiske filer), kan telefonen likevel holde på en gammel
+  `sw.js`, og da byttes appen aldri. Bruk `Cache-Control: no-store` på akkurat de to.
+- **Safari-fanen og ikonet på Hjem-skjermen er to installasjoner.** Fra iOS 17 har en
+  app på Hjem-skjermen egen lagring, atskilt fra Safari. Å nullstille i Safari rører
+  den ikke. Står den fast, må ikonet slettes og legges til på nytt.
+- Utelukk serveren før du klandrer klienten: hent `/`, `/sw.js` og hovedmodulen over
+  **den adressen brukeren faktisk har** (ikke `localhost`), og last den i en ekte
+  nettleser med `--host-resolver-rules=MAP <vert> <ip>` når DNS ikke finnes lokalt.
+  Er versjonen riktig der, ligger feilen i klientens lagring.
 
 ## 5. Deploy-siden av det samme
 
