@@ -122,6 +122,23 @@ rectangle and look at it. There is no OCR in the loop — you are reading the dr
 Say plainly that the handwriting does not survive a rebuild; save it as PNG first if
 it is worth keeping.
 
+**Deleting from the cloud does not delete from the tablet — and the tablet syncs
+its copy back.** Replace a document under the same name and you get a merge, not a
+replacement: the cloud ends up with both page sets interleaved. A 62-page book came
+back as 124 pages where, from page 28 on, it alternated between two places in the
+book. It reads exactly like the pages are in the wrong order, because they are.
+
+So when resending a document the user already has open:
+
+```bash
+rmapi ls /Claude                       # how many copies are actually there?
+rmapi get "/Claude/<name>" && …        # count cPages.pages — 2x means it merged
+```
+
+**Upload under a new name** rather than reusing the old one, and tell the user to
+delete the old document *on the tablet*. Deleting it in the cloud alone lets it
+come back at the next sync.
+
 **Two documents with the same name break every path-based command.** `get`, `geta`
 and `stat` each pick one arbitrarily — and `rm` deletes *both*. Check with
 `rmapi ls <dir>` before any of them, use `get --id <uuid>` when in doubt, and keep a
