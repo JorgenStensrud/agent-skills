@@ -73,6 +73,31 @@ written anywhere. `GARMIN_EMAIL` and `GARMIN_PASSWORD` work for unattended runs.
 **Never pass credentials as arguments.** `argv` is readable by every process on the
 machine, so the script has no `--password` flag on purpose. Don't add one.
 
+**When the user is on their phone,** don't ask them to type the password into the
+chat — it stays in the transcript forever, and a password there cannot be taken
+back. Serve them a form instead:
+
+```bash
+python3 innlogging.py --port 8477 &
+tailscale serve --bg --https 8477 http://127.0.0.1:8477
+# they open https://<host>.ts.net:8477, fill it in, page shuts itself down
+```
+
+It is one page, two steps (password, then the one-time code if the account asks
+for it), and it exits 0 once the tokens are saved. Bind to localhost and put
+`tailscale serve` in front — over plain HTTP the password crosses the network in
+clear text. The fields carry `autocomplete="current-password"` and
+`one-time-code`, so iOS offers the keychain entry and autofills the code.
+
+### Two things that cost an hour here
+
+- **`login()` returns `(None, None)` on a clean login.** Only `("needs_mfa", state)`
+  means a code is needed. Treating a `None` status as failure rejects a login that
+  actually worked — the tokens were valid and got thrown away.
+- **Save with `client.dump(path)`.** `garth.dump()` is from the old library and
+  raises `AttributeError` here. It fires *after* a successful login, so it looks
+  like the login failed when it did not.
+
 **How often you log in again: roughly once a year.** Two tokens are involved. The
 short one expires in hours and the library refreshes it from the long one before
 each call, without touching the login endpoint — which also dodges the Cloudflare

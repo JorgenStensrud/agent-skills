@@ -56,7 +56,7 @@ def auth() -> None:
     except Exception as e:  # noqa: BLE001
         feil(5, f"innlogging avvist: {type(e).__name__}: {e}")
     os.makedirs(TOKENS, mode=0o700, exist_ok=True)
-    g.garth.dump(TOKENS)
+    g.client.dump(TOKENS)
     os.chmod(TOKENS, 0o700)
     print(f"innlogget. tokens lagret i {TOKENS}")
 
