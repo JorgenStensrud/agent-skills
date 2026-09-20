@@ -75,6 +75,17 @@ are independent — tags classify, folders file.
 5. **Confirm before sending personal or sensitive content** — uploads go to
    reMarkable's servers.
 
+## Keep `rmapi` current
+
+The cloud's sync schema moves, and an old `rmapi` writes an old one. When that
+happens `ls` still works — auth and listing are fine — but every upload dies with
+`400 {"message":"invalid root schema"}` while writing `root.docSchema`. Nothing in
+the error names the version, so it reads like a bad file: it is not, and a smaller
+PDF fails the same way.
+
+Cure: raise `RMAPI_VERSION` in `send.sh`, delete `bin/rmapi`, and run again — it
+self-downloads. Seen 20 September 2026 on v0.0.34, fixed by v0.0.35.
+
 ## Exit codes
 
 | Code | Meaning |

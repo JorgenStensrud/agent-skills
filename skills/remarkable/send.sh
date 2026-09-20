@@ -10,7 +10,7 @@ set -euo pipefail
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 RMAPI="$HERE/bin/rmapi"
-RMAPI_VERSION="v0.0.34"
+RMAPI_VERSION="v0.0.35"
 
 ensure_rmapi() {
   [ -x "$RMAPI" ] && return 0
