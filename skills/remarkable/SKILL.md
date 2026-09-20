@@ -77,25 +77,60 @@ are independent — tags classify, folders file.
 5. **Confirm before sending personal or sensitive content** — uploads go to
    reMarkable's servers.
 
-## Reading back what was written on it
+## Markup review: send a draft, read the notes, fix, resend
 
-Rule 1 says this skill only sends, and it does. But the ink comes down with the
-document, so when the user asks what they wrote, it is available:
+The tablet is a good place to review a long document, and the notes come back with
+it. This round-trip is the most useful thing the skill does. Do not offer it
+unprompted — rule 1 still holds — but when the user says they wrote something on it,
+this is the loop.
+
+**1. Send the draft.** Ordinary `send.sh`. Landscape PDFs are declared landscape, so
+the page fills the screen and the ink lands where it looks like it lands.
+
+**2. Read the marked-up pages.** One command does the hard part:
 
 ```bash
-rmapi geta "/Claude/<name>"     # PDF with the strokes drawn onto the pages
+rmapi geta "/Claude/<name>"          # PDF with the strokes drawn onto the pages
+pdftoppm -r 90 -png -f <n> -l <n> "<name>-annotations.pdf" out/page
 ```
 
-`geta` is the right tool — it places the ink on the page for you, which hand-rolled
-rendering does not. For the strokes alone, extract the `.rm` files from a `get` and
-run `uvx --from rmc rmc -t svg <file>.rm`; the page number comes from matching the
-file's UUID against `cPages.pages[i].id`. Render to PNG and read it; there is no OCR
-in the loop.
+Then look at the PNG. **Use `geta`, not your own compositing.** The ink is stored in
+the tablet's coordinate system, not the PDF's, and the two do not line up by
+translation — an arrow rendered on its own tells you nothing about what it points at.
+`geta` resolves that; hand-rolled overlay maths does not.
+
+**3. Find which page each note is on.** Each `.rm` file is named after a page UUID:
+
+```bash
+rmapi get "/Claude/<name>"   # or: get --id <uuid>
+python3 -c "
+import zipfile,json,glob,os
+z=zipfile.ZipFile(glob.glob('*.rmdoc')[0])
+c=json.loads(z.read([n for n in z.namelist() if n.endswith('.content')][0]))
+rm={os.path.basename(n)[:-3]: z.getinfo(n).file_size for n in z.namelist() if n.endswith('.rm')}
+for i,p in enumerate(c['cPages']['pages']):
+    if p['id'] in rm: print('page', i+1, '->', rm[p['id']], 'bytes')"
+```
+
+A layer under ~500 bytes is an empty page the user merely opened, not a note.
+
+**4. Read strokes alone** when you only need the words and not the context:
+`uvx --from rmc rmc -t svg <uuid>.rm`, then render the SVG to PNG over a white
+rectangle and look at it. There is no OCR in the loop — you are reading the drawing.
+
+**5. Resend after fixing.** Delete first, or you get two documents with one name.
+Say plainly that the handwriting does not survive a rebuild; save it as PNG first if
+it is worth keeping.
 
 **Two documents with the same name break every path-based command.** `get`, `geta`
 and `stat` each pick one arbitrarily — and `rm` deletes *both*. Check with
 `rmapi ls <dir>` before any of them, use `get --id <uuid>` when in doubt, and keep a
 local copy before deleting anything that has ink on it.
+
+**A note that reads like a layout complaint usually is one.** «text is on top of the
+figure» was true: measured in a browser with the real font, the label sat 0.2 units
+under the drawing. Reproduce with the actual fonts before believing a render that
+looks fine — a fallback font with shorter letters hides the collision.
 
 ## Every page showed the cover
 
