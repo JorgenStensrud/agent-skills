@@ -35,6 +35,22 @@ def page_idx(i: int) -> str:
     return "bz" + chr(ord("a") + (i - 26) % 26) * (1 + (i - 26) // 26)
 
 
+def is_landscape(pdf_bytes: bytes) -> bool:
+    """True when the first page is wider than it is tall.
+
+    The tablet is a portrait screen. A landscape PDF left as "portrait" is shown
+    letterboxed in the top part of the sheet, and — worse — the annotation layer
+    keeps portrait coordinates, so a pen stroke no longer lines up with the page
+    underneath it. Declaring the orientation makes the page fill the screen when
+    the tablet is turned, and the ink lands where it looks like it lands.
+    """
+    m = re.search(rb"/MediaBox\s*\[\s*([\d.+-]+)\s+([\d.+-]+)\s+([\d.+-]+)\s+([\d.+-]+)", pdf_bytes)
+    if not m:
+        return False
+    x0, y0, x1, y1 = (float(v) for v in m.groups())
+    return abs(x1 - x0) > abs(y1 - y0)
+
+
 def build(pdf_path: str, out_path: str, name: str, tags: list[str]) -> None:
     pdf = open(pdf_path, "rb").read()
     pages = page_count(pdf)
@@ -58,7 +74,7 @@ def build(pdf_path: str, out_path: str, name: str, tags: list[str]) -> None:
         "lastOpenedPage": 0,
         "lineHeight": -1,
         "margins": 180,
-        "orientation": "portrait",
+        "orientation": "landscape" if is_landscape(pdf) else "portrait",
         "pageCount": pages,
         "pageTags": [],
         "sizeInBytes": str(len(pdf)),

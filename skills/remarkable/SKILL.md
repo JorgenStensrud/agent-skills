@@ -71,9 +71,31 @@ are independent — tags classify, folders file.
    rather than reusing an old one.
 4. **PDFs pass through unrendered.** An A4 PDF stays A4 and will look small on
    a 10.3" screen. That is expected; re-paginating would wreck the original
-   layout. Only HTML/Markdown gets e-ink treatment.
+   layout. Only HTML/Markdown gets e-ink treatment. A landscape PDF is declared
+   `"orientation": "landscape"` in `.content`, which both fills the screen when
+   the tablet is turned and keeps pen strokes aligned with the page under them.
 5. **Confirm before sending personal or sensitive content** — uploads go to
    reMarkable's servers.
+
+## Reading back what was written on it
+
+Rule 1 says this skill only sends, and it does. But the ink comes down with the
+document, so when the user asks what they wrote, it is available:
+
+```bash
+rmapi geta "/Claude/<name>"     # PDF with the strokes drawn onto the pages
+```
+
+`geta` is the right tool — it places the ink on the page for you, which hand-rolled
+rendering does not. For the strokes alone, extract the `.rm` files from a `get` and
+run `uvx --from rmc rmc -t svg <file>.rm`; the page number comes from matching the
+file's UUID against `cPages.pages[i].id`. Render to PNG and read it; there is no OCR
+in the loop.
+
+**Two documents with the same name break every path-based command.** `get`, `geta`
+and `stat` each pick one arbitrarily — and `rm` deletes *both*. Check with
+`rmapi ls <dir>` before any of them, use `get --id <uuid>` when in doubt, and keep a
+local copy before deleting anything that has ink on it.
 
 ## Every page showed the cover
 
