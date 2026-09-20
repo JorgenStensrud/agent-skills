@@ -73,7 +73,16 @@ written anywhere. `GARMIN_EMAIL` and `GARMIN_PASSWORD` work for unattended runs.
 **Never pass credentials as arguments.** `argv` is readable by every process on the
 machine, so the script has no `--password` flag on purpose. Don't add one.
 
-Tokens last about a year. Exit 2 means re-run `auth`.
+**How often you log in again: roughly once a year.** Two tokens are involved. The
+short one expires in hours and the library refreshes it from the long one before
+each call, without touching the login endpoint — which also dodges the Cloudflare
+block that sometimes sits in front of it. The long one lasts about a year from the
+day it was issued, and only that expiry sends you back to a password and an MFA
+code.
+
+Four things end a session early: Garmin changing the auth flow, a password change,
+signing out everywhere from account settings, and deleting `~/.garminconnect`.
+Exit 2 means re-run `auth`, whatever the reason.
 
 ## Rules
 
