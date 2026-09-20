@@ -106,6 +106,19 @@ export function avgjor({ skall, server, swVedLast, swNaa }) {
   kommer snackbaren hvert femte minutt for samme utrulling.
 - Foten («Hent den») kan ikke importere `app.js` uten sirkulær import: den sender
   `dispatchEvent(new Event('hent-ny-versjon'))`, og `app.js` lytter.
+- **Nødutgang, ellers er alle veiene den samme veien.** Forgrunnssjekken, «Hent den»
+  og `controllerchange` går alle gjennom service workeren. Tar den nye aldri over,
+  hjelper ingen av dem, og telefonen står på gammel kode for alltid — uten at noe ser
+  galt ut. Tell forsøkene, og etter tre: `reg.unregister()`, slett skallcachene, og
+  `location.reload()`. Behold bilde- og flisecachene — de har uforanderlige navn, er
+  dyre å hente igjen, og gammelt er aldri feil for dem.
+
+  ```js
+  export const skallCacher = (navn) => navn.filter((n) => /^app-v\d+$/.test(n));
+  ```
+
+  Nødutgangen ligger i den *nye* koden, så den redder ikke telefonen som alt står
+  fast — den hindrer neste gang. Én fastlåst telefon må gjøre det for hånd.
 
 ## 5. Deploy-siden av det samme
 
