@@ -57,3 +57,7 @@ out/
 *.orders.json
 *.ordrer.json
 innsyn/
+
+# reisebuddy er turspesifikk: navn, adresser og innholdet i en privat app.
+# Ligger lokalt under skills/, men skal aldri inn i et repo som kan bli offentlig.
+skills/reisebuddy/
