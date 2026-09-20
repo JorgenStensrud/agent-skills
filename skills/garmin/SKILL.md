@@ -161,6 +161,9 @@ is not what exit 5 means, and it teaches them a bad habit.
   `raw get_activity_details <id>`.
 - Rate limits. Garmin throttles silently rather than erroring cleanly; a loop over
   a year of dates will start returning empty. Space it out, and cache what you pull.
+- Reading a `429` on login as a wrong password. It is the IP being throttled, and
+  retrying makes it worse. The library retries by itself, so a 429 in the log
+  next to a login that worked is normal — check the outcome, not the log.
 
 ## How it works
 
