@@ -73,7 +73,10 @@ def build(pdf_path: str, out_path: str, name: str, tags: list[str]) -> None:
                 {
                     "id": str(uuid.uuid4()),
                     "idx": {"timestamp": "1:2", "value": page_idx(i)},
-                    "redir": {"timestamp": "1:2", "value": 0},
+                    # Which page of the PDF this entry shows. Hard-coding 0 makes
+                    # every page render the cover — a 62-page book looked like the
+                    # front page 62 times on the tablet.
+                    "redir": {"timestamp": "1:2", "value": i},
                 }
                 for i in range(pages)
             ],

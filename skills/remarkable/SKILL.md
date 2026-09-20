@@ -75,6 +75,23 @@ are independent — tags classify, folders file.
 5. **Confirm before sending personal or sensitive content** — uploads go to
    reMarkable's servers.
 
+## Every page showed the cover
+
+`.content`'s `cPages.pages[i].redir.value` is **which page of the PDF that entry
+renders**. It must be `i`. Hard-coded to 0, a 62-page book syncs, opens, scrolls,
+and reports 62 pages — every one of them the front page. Nothing errors; the
+upload succeeds. Fixed 20 September 2026.
+
+Verify a tagged upload by fetching it back rather than trusting the local tree:
+
+```bash
+rmapi get "/Claude/<name>" && python3 -c "
+import zipfile,json,glob
+z=zipfile.ZipFile(glob.glob('*.rmdoc')[0])
+c=json.loads(z.read([n for n in z.namelist() if n.endswith('.content')][0]))
+p=c['cPages']['pages']; print(len(p), [x['redir']['value'] for x in p[:5]])"
+```
+
 ## Keep `rmapi` current
 
 The cloud's sync schema moves, and an old `rmapi` writes an old one. When that
