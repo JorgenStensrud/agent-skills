@@ -25,6 +25,7 @@ from __future__ import annotations
 import argparse
 import os
 import re
+import subprocess
 import sys
 from pathlib import Path
 
@@ -182,6 +183,14 @@ def main() -> int:
     names: dict[str, str] = {}
 
     skill_dirs = sorted(p for p in SKILLS_DIR.iterdir() if p.is_dir() or p.is_symlink())
+    # Gitignored folders never get committed, so they are not ours to check —
+    # e.g. skills/synced/, which Claude Code writes through the ~/.claude/skills symlink.
+    ignored = set(subprocess.run(
+        ["git", "-C", str(REPO_ROOT), "check-ignore", "--stdin"],
+        input="\n".join(f"skills/{p.name}" for p in skill_dirs),
+        capture_output=True, text=True,
+    ).stdout.split())
+    skill_dirs = [p for p in skill_dirs if f"skills/{p.name}" not in ignored]
     for skill in skill_dirs:
         if skill.name.startswith("."):
             continue

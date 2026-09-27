@@ -16,6 +16,10 @@ skills/kjoleskap
 # den ligger lokalt under skills/, men hører ikke i dette repoet.
 skills/impeccable/
 
+# Claude Code syncs claude.ai skills into ~/.claude/skills/synced/, which on a
+# machine where ~/.claude/skills is a symlink to this folder lands here.
+skills/synced/
+
 # ---------------------------------------------------------------------------
 # Secrets and session state — must never enter the repo.
 #
