@@ -36,7 +36,9 @@ skills/kjoleskap-fjern/bin/kjoleskap-fjern oda kurv fra-liste <liste>
 skills/kjoleskap-fjern/bin/kjoleskap-fjern trumf status
 ```
 
-Annen vert eller sti: `KJOLESKAP_VERT=<ssh-vert> KJOLESKAP_STI=<sti>`.
+Annen vert eller sti: `KJOLESKAP_VERT=<ssh-vert> KJOLESKAP_STI=<sti>`. Kjøres skillen på
+selve verten (maskinnavnet er det samme som `KJOLESKAP_VERT`), går kommandoen lokalt
+uten ssh — så den virker likt overalt.
 
 ## Regler
 

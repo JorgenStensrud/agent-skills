@@ -22,6 +22,11 @@ case "${1:-}" in
   *)     BIN="skills/kjoleskap/bin/kjoleskap" ;;
 esac
 
+# På selve verten: kjør lokalt, ikke ssh til seg selv.
+if [ "$(hostname -s 2>/dev/null)" = "$VERT" ] && [ -x "$HOME/$STI/$BIN" ]; then
+  exec "$HOME/$STI/$BIN" "$@"
+fi
+
 # Hvert argument siteres for skallet på verten, så «--sok "ost og brød"» kommer
 # fram som ett argument.
 printf -v ARGS ' %q' "$@"
