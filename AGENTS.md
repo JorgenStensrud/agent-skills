@@ -26,6 +26,11 @@ scripts/scan-secrets                                             # staged filer
 python3 skills/trumf-kvitteringer/tests/test_trumf_kvitteringer.py
 ```
 
+`create-cli`, `github-deep-review` og `skill-cleaner` er relative symlinker inn i
+[steipete/agent-scripts](https://github.com/steipete/agent-scripts), klonet som
+`steipete-agent-scripts` ved siden av dette repoet. Mangler den klonen, feiler
+`validate-skills` på dem.
+
 ## Sjekk om noe faktisk er manuelt
 
 `trumf-kvitteringer` ble først levert som en ren parser fordi bestillingsskjemaet hos Trumf
