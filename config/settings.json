@@ -121,5 +121,10 @@
     "claude-fable-5-1": {
       "effortLevel": "high"
     }
+  },
+  "env": {
+    "GOG_READONLY": "1",
+    "GOG_GMAIL_NO_SEND": "1",
+    "GOG_WRAP_UNTRUSTED": "1"
   }
 }
