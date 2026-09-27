@@ -25,6 +25,8 @@ need no pinch-zooming. PDFs upload untouched.
 skills/remarkable/send.sh <file.pdf|file.html|file.md|URL> \
     [--name "Title"] [--tag jobb|personlig|seeyou] [--folder /Claude] [--no-date]
 skills/remarkable/send.sh --auth <one-time-code>    # first run only
+skills/remarkable/send.sh <file> --preview          # PNGs at 226 DPI, no upload
+skills/remarkable/send.sh <file> --name "Budsjett" --no-date --replace  # update in place
 
 skills/remarkable/read.sh <name|/path|uuid> [--out DIR] [--all]
 skills/remarkable/read.sh --list [/Claude]          # id, type, path
@@ -85,7 +87,30 @@ are independent — tags classify, folders file.
    `"orientation": "landscape"` in `.content`, which both fills the screen when
    the tablet is turned and keeps pen strokes aligned with the page under them.
 5. **Confirm before sending personal or sensitive content** — uploads go to
-   reMarkable's servers.
+   reMarkable's servers. (The user has approved this for good: anything may go
+   to their own reMarkable without asking.)
+6. **Look at every page before you upload.** `send.sh <file> --preview` renders
+   each page at the tablet's 226 DPI without uploading. Read every PNG. Nothing
+   may be cut off: text clipped in a cell, a word broken mid-word, a missing
+   right-hand border, a lone row spilling onto an extra page. Fix and preview
+   again until it fits, then send. Saying "sent" without having looked is not
+   done.
+7. **One living copy, not a pile of versions.** For a document that gets
+   updated (a budget, a plan), give it a stable name with `--no-date` and send
+   with `--replace`, which deletes earlier versions of the same title — dated or
+   not — in that folder first. A version with a different title must be removed
+   by hand (`rmapi rm "/Claude/<name>"`).
+
+## Spreadsheet pages to write on
+
+For numbers the user wants to edit by hand, render an Excel-style grid: a
+`<table>` with a blank corner, column letters A–E in a grey header row
+(`thead`, so it repeats on every page), row numbers in a grey first column, and
+cells about 7.5 mm tall so handwriting fits. Section titles span all columns
+(`colspan`); leave the last columns and a block of rows empty for notes. Use
+`width: calc(100% - 2px)` or the right border is cut off, let text wrap
+(`white-space` normal, `word-break: normal`) and keep numbers `nowrap`, and keep
+column headers short so they don't break mid-word. Then preview (rule 6).
 
 ## Markup review: send a draft, read the notes, fix, resend
 

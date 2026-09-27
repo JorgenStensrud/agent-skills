@@ -1,6 +1,9 @@
 #!/usr/bin/env bash
 # Send a document to the reMarkable cloud: here -> tablet. read.sh goes the other way.
 # Usage: send.sh <file> [--name "Title"] [--tag jobb|personlig|seeyou] [--folder /Claude] [--no-date]
+#                        [--replace] [--preview]
+# --preview renders every page at the tablet's 226 DPI and prints the PNGs; no upload.
+# --replace deletes earlier versions (same title, with or without date) first.
 #        send.sh --auth <one-time-code>     # one-time pairing
 # Names get a "YYYY-MM-DD " prefix so sorting by name on the tablet reads
 # chronologically. Pass --no-date to skip it. --tag sets real reMarkable
@@ -51,14 +54,16 @@ if [ "${1:-}" = "--auth" ]; then
 fi
 
 # --- args ---------------------------------------------------------------
-SRC=""; NAME=""; FOLDER="/Claude"; DATED=1; TAG=""
+SRC=""; NAME=""; FOLDER="/Claude"; DATED=1; TAG=""; REPLACE=0; PREVIEW=0
 while [ $# -gt 0 ]; do
   case "$1" in
     --name)    NAME="${2:-}"; shift 2 ;;
     --folder)  FOLDER="${2:-}"; shift 2 ;;
     --tag)     TAG="${2:-}"; shift 2 ;;
     --no-date) DATED=0; shift ;;
-    -h|--help) sed -n '2,8p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+    --replace) REPLACE=1; shift ;;
+    --preview) PREVIEW=1; shift ;;
+    -h|--help) sed -n '2,11p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
     -*) echo "send: unknown flag $1" >&2; exit 3 ;;
     *)  [ -z "$SRC" ] && SRC="$1" || { echo "send: one input at a time" >&2; exit 3; }; shift ;;
   esac
@@ -113,6 +118,15 @@ case "$SRC" in
     "$HERE/render.sh" "$SRC" "$PDF" || exit $? ;;
 esac
 
+# --- preview: look at every page as the tablet will show it --------------
+if [ "$PREVIEW" = 1 ]; then
+  OUT="${TMPDIR:-/tmp}/remarkable-preview/$NAME"; rm -rf "$OUT"; mkdir -p "$OUT"
+  pdftoppm -r 226 -png "$PDF" "$OUT/page" || { echo "send: preview render failed" >&2; exit 4; }
+  echo "preview of \"$NAME\" ($(ls "$OUT" | wc -l | tr -d ' ') pages at 226 DPI, not uploaded):"
+  ls "$OUT"/*.png
+  exit 0
+fi
+
 # --- upload -------------------------------------------------------------
 # Create each level in turn — mkdir does not make parents. Already-exists: fine.
 ACC=""
@@ -126,6 +140,36 @@ done
 # rmapi rebuilds .content for a bare PDF and drops tags, but uploads .rmdoc
 # archives verbatim — so a tagged document has to be wrapped first. It takes the
 # document name from the filename either way.
+# --replace: remove earlier versions — same title with or without a date
+# prefix, in this folder only. Found by id in the refreshed tree, removed by path.
+if [ "$REPLACE" = 1 ]; then
+  "$RMAPI" -ni refresh >/dev/null 2>&1 || true
+  CACHE=""
+  for c in "$HOME/Library/Caches/rmapi/tree.cache" "${XDG_CACHE_HOME:-$HOME/.cache}/rmapi/tree.cache"; do
+    [ -f "$c" ] && { CACHE="$c"; break; }
+  done
+  [ -n "$CACHE" ] && python3 - "$CACHE" "$FOLDER" "$NAME" <<'PY' | sort -u | while IFS= read -r old; do
+import json, re, sys
+cache, folder, name = sys.argv[1:]
+undated = lambda n: re.sub(r"^\d{4}-\d{2}-\d{2} ", "", n)
+docs = json.load(open(cache))["Docs"]
+by_id = {d["DocumentID"]: d for d in docs}
+def path(d):
+    parts = []
+    while d:
+        parts.append(d["Metadata"]["visibleName"]); d = by_id.get(d["Metadata"]["parent"])
+    return "/" + "/".join(reversed(parts))
+for d in docs:
+    m = d["Metadata"]
+    if m["type"] == "DocumentType" and not m.get("deleted") and m["parent"] != "trash" \
+       and path(d).rsplit("/", 1)[0] == folder.rstrip("/") and undated(m["visibleName"]) == undated(name):
+        print(m["visibleName"])
+PY
+    "$RMAPI" -ni rm "$FOLDER/$old" >/dev/null 2>&1 \
+      && echo "replaced: removed \"$old\"" || echo "send: could not remove \"$old\"" >&2
+  done
+fi
+
 UPLOAD="$PDF"
 if [ -n "$TAGS" ]; then
   UPLOAD="$TMP/$NAME.rmdoc"
