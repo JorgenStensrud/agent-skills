@@ -26,9 +26,10 @@ scripts/scan-secrets                                             # staged filer
 python3 skills/trumf-kvitteringer/tests/test_trumf_kvitteringer.py
 ```
 
-`validate-skills` melder tre advarsler på Linux (`create-cli`, `github-deep-review`,
-`skill-cleaner` er symlinker til `/Users/sten/...`). De er forventet på en ikke-Mac-maskin,
-stopper ikke en commit, og har ingenting med endringene dine å gjøre.
+`create-cli`, `github-deep-review` og `skill-cleaner` er relative symlinker inn i
+[steipete/agent-scripts](https://github.com/steipete/agent-scripts), klonet som
+`steipete-agent-scripts` ved siden av dette repoet. Mangler den klonen, feiler
+`validate-skills` på dem.
 
 ## Sjekk om noe faktisk er manuelt
 
