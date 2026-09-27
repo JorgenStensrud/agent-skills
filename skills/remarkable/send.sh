@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Send a document to the reMarkable cloud. One way: here -> tablet.
+# Send a document to the reMarkable cloud: here -> tablet. read.sh goes the other way.
 # Usage: send.sh <file> [--name "Title"] [--tag jobb|personlig|seeyou] [--folder /Claude] [--no-date]
 #        send.sh --auth <one-time-code>     # one-time pairing
 # Names get a "YYYY-MM-DD " prefix so sorting by name on the tablet reads

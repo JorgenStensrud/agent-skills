@@ -3,15 +3,17 @@ name: remarkable
 description: >-
   Use when the user wants to send something to their reMarkable tablet —
   "send this to my reMarkable", "put this on the rM", "I want to read this
-  on my tablet", "print this for the reMarkable". One way only: here to
-  tablet, over the reMarkable cloud. Does not read from the tablet.
+  on my tablet", "print this for the reMarkable" — or read something back
+  off it: "read my notes", "what did I write on the rM", "read my markup on
+  the draft", a notebook or document by name. Over the reMarkable cloud.
 allowed-tools: Bash, Read, Write
 ---
 
 # remarkable
 
-Send a document to a reMarkable 2 over the reMarkable cloud. The tablet syncs
-it over its own wifi — no cable, no shared network, no Connect subscription.
+Send a document to a reMarkable 2 over the reMarkable cloud, and read notebooks
+and marked-up documents back. The tablet syncs over its own wifi — no cable, no
+shared network, no Connect subscription.
 
 HTML and Markdown are re-rendered with e-ink typography sized to the rM2 screen
 (158×210 mm, 12 pt serif, pure black on white) so pages fill the display and
@@ -23,7 +25,15 @@ need no pinch-zooming. PDFs upload untouched.
 skills/remarkable/send.sh <file.pdf|file.html|file.md|URL> \
     [--name "Title"] [--tag jobb|personlig|seeyou] [--folder /Claude] [--no-date]
 skills/remarkable/send.sh --auth <one-time-code>    # first run only
+
+skills/remarkable/read.sh <name|/path|uuid> [--out DIR] [--all]
+skills/remarkable/read.sh --list [/Claude]          # id, type, path
 ```
+
+`read.sh` prints one `page N: <png>` line per page with ink on it; look at the
+PNGs with Read. PDFs come back with the ink drawn on the page; notebooks as the
+strokes alone. There is no OCR — you read the handwriting from the image. A name
+with `/` in it ("Sunday-27/09") works: lookup goes by document id, never by path.
 
 `--name` sets the title shown on the tablet; it defaults to the filename.
 
@@ -57,8 +67,8 @@ are independent — tags classify, folders file.
 
 ## Rules
 
-1. **One direction.** This sends only. There is no read-back, no OCR, no
-   pulling notes off the tablet. Don't offer it.
+1. **Read only what was asked for.** `read.sh` pulls personal handwriting
+   off the cloud; fetch the document the user named, not the library.
 2. **`rmapi`'s local tree goes stale — run `rmapi refresh` before trusting it.**
    `stat` will report `Tags: []` on a document that is correctly tagged, and
    `ls` will show documents that are already deleted (or hide ones that exist).
@@ -80,45 +90,24 @@ are independent — tags classify, folders file.
 ## Markup review: send a draft, read the notes, fix, resend
 
 The tablet is a good place to review a long document, and the notes come back with
-it. This round-trip is the most useful thing the skill does. Do not offer it
-unprompted — rule 1 still holds — but when the user says they wrote something on it,
-this is the loop.
+it. This round-trip is the most useful thing the skill does: when the user says they
+wrote something on it, this is the loop.
 
 **1. Send the draft.** Ordinary `send.sh`. Landscape PDFs are declared landscape, so
 the page fills the screen and the ink lands where it looks like it lands.
 
-**2. Read the marked-up pages.** One command does the hard part:
+**2. Read the marked-up pages.** `read.sh "<name>"`, then look at each PNG it lists.
+It renders only pages with ink, numbered as on the tablet, via `rmapi geta` — **use
+`geta`, not your own compositing.** The ink is stored in the tablet's coordinate
+system, not the PDF's, and the two do not line up by translation; an arrow rendered
+on its own tells you nothing about what it points at. `geta` only takes a path, so
+a PDF whose name contains `/` falls back to strokes without the page under them —
+`read.sh` says so. Rename it on the tablet if the context matters.
 
-```bash
-rmapi geta "/Claude/<name>"          # PDF with the strokes drawn onto the pages
-pdftoppm -r 90 -png -f <n> -l <n> "<name>-annotations.pdf" out/page
-```
+A layer under ~500 bytes is an empty page the user merely opened, not a note;
+`read.sh` skips those (`--all` renders every page anyway).
 
-Then look at the PNG. **Use `geta`, not your own compositing.** The ink is stored in
-the tablet's coordinate system, not the PDF's, and the two do not line up by
-translation — an arrow rendered on its own tells you nothing about what it points at.
-`geta` resolves that; hand-rolled overlay maths does not.
-
-**3. Find which page each note is on.** Each `.rm` file is named after a page UUID:
-
-```bash
-rmapi get "/Claude/<name>"   # or: get --id <uuid>
-python3 -c "
-import zipfile,json,glob,os
-z=zipfile.ZipFile(glob.glob('*.rmdoc')[0])
-c=json.loads(z.read([n for n in z.namelist() if n.endswith('.content')][0]))
-rm={os.path.basename(n)[:-3]: z.getinfo(n).file_size for n in z.namelist() if n.endswith('.rm')}
-for i,p in enumerate(c['cPages']['pages']):
-    if p['id'] in rm: print('page', i+1, '->', rm[p['id']], 'bytes')"
-```
-
-A layer under ~500 bytes is an empty page the user merely opened, not a note.
-
-**4. Read strokes alone** when you only need the words and not the context:
-`uvx --from rmc rmc -t svg <uuid>.rm`, then render the SVG to PNG over a white
-rectangle and look at it. There is no OCR in the loop — you are reading the drawing.
-
-**5. Resend after fixing.** Delete first, or you get two documents with one name.
+**3. Resend after fixing.** Delete first, or you get two documents with one name.
 Say plainly that the handwriting does not survive a rebuild; save it as PNG first if
 it is worth keeping.
 
@@ -182,8 +171,8 @@ self-downloads. Seen 20 September 2026 on v0.0.34, fixed by v0.0.35.
 | Code | Meaning |
 |------|---------|
 | 2 | Not paired — run `--auth <code>` |
-| 3 | Bad input (unsupported type, missing file) |
-| 4 | Render failed (no Chrome, bad markdown, unreachable URL) |
+| 3 | Bad input (unsupported type, missing file); `read.sh`: no match, or several — it lists them |
+| 4 | Render failed (no Chrome, bad markdown, unreachable URL; `read.sh`: download or page render) |
 | 5 | Upload rejected by the cloud |
 
 ## Common mistakes
