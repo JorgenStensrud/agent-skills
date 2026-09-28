@@ -54,6 +54,7 @@ Live in this repo. `~/.claude/skills` is a symlink to `./skills`.
 | `skill-cleaner` | Skill audit: budget, usage, duplicates, compact descriptions. Keeps the growing skill collection from turning into porridge. | Symlink → `~/dev/personal/steipete-agent-scripts/skills/skill-cleaner`. Auto-updates via `git -C ~/dev/personal/steipete-agent-scripts pull`. |
 | `create-cli` | CLI UX/spec conventions: args, flags, help, output, errors, config, dry-run. | Symlink → same clone. Auto-updates via git pull. |
 | `github-deep-review` | Deep GitHub PR review — fetch remote PR, read changed code first, distinguish stale-vs-real, propose the best fix. Fills the "review a GitHub PR in any repo" gap that codex plugin's `/review` doesn't cover (it targets local git state). | Symlink → same clone. Auto-updates via git pull. |
+| `humanizer` | Rewrite AI-sounding prose so it reads like the writer: 26 patterns from Wikipedia's "Signs of AI writing", strongest first. | Copied from [blader/humanizer](https://github.com/blader/humanizer) @ `225a6f3` (v3.1.0, MIT) — `SKILL.md` + `LICENSE` only; plugin manifests, validator script and CI left out. Manual update if upstream changes. |
 
 - Add: `mkdir skills/<name>` + `SKILL.md` with YAML frontmatter (`name`, `description`)
 - Remove: `git rm -r skills/<name>`
