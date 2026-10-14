@@ -102,7 +102,9 @@ are independent — tags classify, folders file.
    updated (a budget, a plan), give it a stable name with `--no-date` and send
    with `--replace`, which deletes earlier versions of the same title — dated or
    not — in that folder first. A version with a different title must be removed
-   by hand (`rmapi rm "/Claude/<name>"`).
+   by hand (`rmapi rm "/Claude/<name>"`). **Not when the old copy has ink or is
+   open on the tablet:** the tablet syncs its copy back and the pages merge (see
+   Markup review). Ask first; if in doubt, send under a new name instead.
 
 ## Spreadsheet pages to write on
 
@@ -191,8 +193,47 @@ happens `ls` still works — auth and listing are fine — but every upload dies
 the error names the version, so it reads like a bad file: it is not, and a smaller
 PDF fails the same way.
 
-Cure: raise `RMAPI_VERSION` in `send.sh`, delete `bin/rmapi`, and run again — it
-self-downloads. Seen 20 September 2026 on v0.0.34, fixed by v0.0.35.
+Cure: raise `RMAPI_VERSION` in `send.sh` and replace the four checksums in
+`rmapi_sha256` with the ones on the GitHub release, then run again — the version
+file in `bin/` no longer matches, so it downloads and verifies the new build. Seen 20 September 2026 on v0.0.34, fixed by v0.0.35.
+
+## Dependencies
+
+`curl`, `python3`, and `uv` (`uvx` runs pinned `markdown` and `rmc`) for both
+scripts. `send.sh` renders with Chrome or Chromium (Playwright's
+`chrome-headless-shell` works) and previews with `pdftoppm` (poppler).
+`read.sh` needs `pdftoppm` for PDFs, and `rsvg-convert` (librsvg) plus `magick`
+(ImageMagick) for notebook pages; where those are missing, the `rmc` SVG can
+instead be opened in headless Chrome and screenshotted, cropped to the strokes
+with `getBBox()`. `rmapi` downloads itself.
+
+## Building it into an app or service
+
+The scripts are for a person at a terminal. A server that sends or reads on the
+user's behalf needs a few things they don't:
+
+- **Its own connection, never the user's token.** Run `rmapi` with `HOME`,
+  `XDG_CONFIG_HOME`, `XDG_CACHE_HOME` and `RMAPI_CONFIG` all pointing into a
+  private folder in the app's data dir, and pair it with its own one-time code.
+  The app then shows up as a device of its own under *Connected devices* on
+  my.remarkable.com and can be revoked without touching anything else.
+- **"Is it paired?" without the network:** the token file exists and is not
+  empty. Check that before offering the feature.
+- **Pin everything:** `rmapi` by version and sha256 with a version file next to
+  it (as `send.sh` does), and `markdown`/`rmc` at fixed versions in a venv or via
+  `uvx --from pkg==x.y`. `rmc` follows the tablet's file format, so a firmware
+  update may need a newer one — on purpose, not by accident.
+- **Chrome as a service user:** `--user-data-dir=<tmp>` and a temporary `HOME`
+  per render (as `render.sh` does), or it fails without a writable home and
+  parallel renders crash each other.
+- **No emoji on a server without fonts.** They render as empty boxes; plain
+  symbols such as ☐ are fine.
+- **Images for a model:** at most 1568 px on the long side, and a cap on pages
+  per read that says how many pages have ink, so the model knows what it missed.
+- **Test without the cloud:** put `rmapi` behind a small interface (`paired`,
+  `list`, `read`, `send`) with a fake runner. Parse the tree as pure functions
+  against a made-up `tree.cache` that has the trash, `deleted`, a folder in the
+  trash, `/` in a name, and two documents that match the same query.
 
 ## Exit codes
 
@@ -224,7 +265,7 @@ URL    → curl → HTML ───────┘  eink.css│            └─
 ```
 
 `bin/rmapi` ([ddvk/rmapi](https://github.com/ddvk/rmapi)) handles cloud auth and
-upload; it self-downloads on first use if missing. Markdown conversion shells out
+upload; it self-downloads on first use, checked against a pinned sha256. Markdown conversion shells out
 to `uvx --from markdown markdown_py`. Rendering uses Google Chrome if installed,
 otherwise Playwright's bundled `chrome-headless-shell`.
 
