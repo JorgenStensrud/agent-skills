@@ -41,13 +41,18 @@ async function rullUt(versjon, cache) {
   await stoppServer();
   await startServer(versjon);
 }
+// Chrome finnes før serveren startes, og alt skriptet starter, ryddes i finally:
+// ellers blir serveren hengende og holder porten når noe feiler underveis.
+const CHROME = finnChrome();
 if ((await versjonNaa()) !== undefined) { console.error(`noe svarer alt på ${BASIS}; stopp det eller velg en annen port`); process.exit(1); }
-await startServer();
 const DEV = 9200 + Math.floor(Math.random()*60);
 const profil = fs.mkdtempSync(path.join(os.tmpdir(),'chrome-nv-'));
-const chrome = spawn(finnChrome(),['--headless=new','--disable-gpu','--disable-extensions','--no-sandbox',`--remote-debugging-port=${DEV}`,`--user-data-dir=${profil}`,'about:blank'],{stdio:'ignore'});
+let chrome, ws;
+try {
+await startServer();
+chrome = spawn(CHROME,['--headless=new','--disable-gpu','--disable-extensions','--no-sandbox',`--remote-debugging-port=${DEV}`,`--user-data-dir=${profil}`,'about:blank'],{stdio:'ignore'});
 let liste; for(let i=0;i<50;i++){try{liste=await (await fetch(`http://127.0.0.1:${DEV}/json/list`)).json();if(liste.length)break;}catch{}await vent(200);}
-const ws=new WebSocket(liste.find(t=>t.type==='page').webSocketDebuggerUrl); await new Promise(r=>(ws.onopen=r));
+ws=new WebSocket(liste.find(t=>t.type==='page').webSocketDebuggerUrl); await new Promise(r=>(ws.onopen=r));
 let id=0; const v=new Map(); let lastinger=0; const feil=[];
 ws.onmessage=(e)=>{const m=JSON.parse(e.data); if(m.method==='Page.frameNavigated'&&!m.params.frame.parentId&&m.params.frame.url.startsWith(BASIS)) lastinger++; if(m.method==='Runtime.exceptionThrown') feil.push((m.params.exceptionDetails.exception?.description||'').slice(0,120)); if(m.id&&v.has(m.id)){v.get(m.id)(m);v.delete(m.id);}};
 const kall=(me,p={})=>new Promise(r=>{const i=++id;v.set(i,r);ws.send(JSON.stringify({id:i,method:me,params:p}));});
@@ -76,4 +81,6 @@ let etter2; for (let i=0;i<60;i++){ await vent(500); etter2 = await tilstand(); 
 ut.etterHentDen = { ...etter2, lastinger };
 ut.unntak = feil.slice(0,3);
 console.log(JSON.stringify(ut,null,1));
-ws.close(); chrome.kill(); await stoppServer(); try{fs.rmSync(profil,{recursive:true,force:true});}catch{}
+} finally {
+  ws?.close(); chrome?.kill(); await stoppServer(); try{fs.rmSync(profil,{recursive:true,force:true});}catch{}
+}
