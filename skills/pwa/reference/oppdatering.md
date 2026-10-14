@@ -179,8 +179,9 @@ Det samme mønsteret, men bygget gjør det som ellers glemmes:
 
 - `scripts/frisk-sw.mjs <basis> <cachenavn> '#/rute' …`: fersk installasjon med SW
   på, antall filer i cachen, ingen konsollfeil på de late rutene.
-- `scripts/nyversjon-e2e.mjs`: appen står oppe, en «ny utrulling» skrives (versjon i
-  `versjon.txt` + `index.html`, nytt cachenavn), serveren restartes, og sida skal bytte
-  av seg selv ved forgrunn og vise «Hent den» under bruk. Tilpass stiene i toppen.
+- `scripts/nyversjon-e2e.mjs <appmappe> <datamappe> [port]`: appen står oppe, en «ny
+  utrulling» skrives (versjon i `versjon.txt` + `index.html`, nytt cachenavn), serveren
+  restartes, og sida skal bytte av seg selv ved forgrunn og vise «Hent den» under bruk.
+  Tilpass `MILJO` og velgerne i toppen av skriptet til appen.
 - `test/oppdatering.test.js`-mønsteret: `avgjor()` og `skallVersjonFra()` som rene
   funksjoner med alle fire kombinasjonene.
