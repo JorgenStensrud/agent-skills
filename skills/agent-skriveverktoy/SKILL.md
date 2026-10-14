@@ -112,13 +112,16 @@ function api(metode, sti, kropp) {
       let tekst = '';
       res.setEncoding('utf8');
       res.on('data', (bit) => (tekst += bit));
+      res.on('error', feil);   // brutt etter headerne: ellers henger løftet
       res.on('end', () => {
-        let svar = null;
-        try { svar = JSON.parse(tekst); } catch { /* 204 eller ikke JSON */ }
+        if (res.statusCode === 204) return ok(null);
+        let svar, json = true;
+        try { svar = JSON.parse(tekst); } catch { json = false; }
         // Serveren svarer { feil: '...' }. Den setningen er mer nyttig for modellen
         // enn statuskoden, så den blir feilmeldingen.
-        if (res.statusCode >= 400) feil(new Error(svar?.feil || `${metode} ${sti} feilet: HTTP ${res.statusCode}`));
-        else ok(svar);
+        if (res.statusCode >= 400) return feil(new Error((json && svar?.feil) || `${metode} ${sti} feilet: HTTP ${res.statusCode}`));
+        if (!json) return feil(new Error(`${metode} ${sti} svarte ikke med JSON (HTTP ${res.statusCode}).`));
+        ok(svar);
       });
     });
     req.on('error', feil);

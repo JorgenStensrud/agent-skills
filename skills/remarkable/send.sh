@@ -76,16 +76,17 @@ case "$FOLDER" in /*) ;; *) FOLDER="/$FOLDER" ;; esac
 # ("kunde kunde jobb" makes --tag kunde set both). With the file, only listed
 # names are accepted. Without it, --tag sets the name as a single tag.
 TAGS_FILE="${XDG_CONFIG_HOME:-$HOME/.config}/remarkable/tags"
-TAGS=""
+# An array, so a tag with a space stays one tag and "*" is never globbed.
+TAGS=()
 if [ -n "$TAG" ] && [ -f "$TAGS_FILE" ]; then
   vocab() { sed 's/#.*//' "$TAGS_FILE"; }   # comments may follow a line or fill it
-  TAGS="$(vocab | awk -v t="$TAG" 'tolower($1) == tolower(t) {
+  read -ra TAGS <<< "$(vocab | awk -v t="$TAG" 'tolower($1) == tolower(t) {
     n = $1; $1 = ""; sub(/^ +/, ""); print ($0 == "" ? n : $0); exit }')"
-  [ -n "$TAGS" ] || {
+  [ "${#TAGS[@]}" -gt 0 ] || {
     echo "send: unknown tag '$TAG' (want one of: $(vocab | awk 'NF { print $1 }' | paste -sd, -))" >&2
     exit 3; }
 elif [ -n "$TAG" ]; then
-  TAGS="$TAG"
+  TAGS=("$TAG")
 fi
 
 ensure_rmapi || exit 2
@@ -178,17 +179,18 @@ PY
 fi
 
 UPLOAD="$PDF"
-if [ -n "$TAGS" ]; then
+if [ "${#TAGS[@]}" -gt 0 ]; then
   UPLOAD="$TMP/$NAME.rmdoc"
-  python3 "$HERE/mkrmdoc.py" "$PDF" "$UPLOAD" "$NAME" $TAGS >/dev/null \
+  python3 "$HERE/mkrmdoc.py" "$PDF" "$UPLOAD" "$NAME" "${TAGS[@]}" >/dev/null \
     || { echo "send: could not build .rmdoc wrapper" >&2; exit 4; }
 fi
 
 "$RMAPI" -ni put "$UPLOAD" "$FOLDER" >"$TMP/put.log" 2>&1 \
   || { echo "send: upload rejected — $(tail -1 "$TMP/put.log")" >&2; exit 5; }
 
-if [ -n "$TAGS" ]; then
-  echo "sent \"$NAME\" to $FOLDER tagged [${TAGS// /, }] — sync the tablet over wifi to see it"
+if [ "${#TAGS[@]}" -gt 0 ]; then
+  LIST="$(printf '%s, ' "${TAGS[@]}")"
+  echo "sent \"$NAME\" to $FOLDER tagged [${LIST%, }] — sync the tablet over wifi to see it"
 else
   echo "sent \"$NAME\" to $FOLDER — sync the tablet over wifi to see it"
 fi
