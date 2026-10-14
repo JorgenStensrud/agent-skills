@@ -66,7 +66,7 @@ ubrukelige til å vise noe — en PNG servert fra appen virket.
 | `frisk-sw.mjs <basis> <cachenavn> [ruter]` | fersk installasjon **med** SW: aktiv?, cachenavn, antall filer i skallet, konsollfeil på late ruter |
 | `konsoll.mjs <basis> [ruter]` | sveip over ruter med SW på: konsollfeil, HTTP ≥ 400, bilder som ikke lastet |
 | `ios-sjekk.mjs <basis>` | iOS-runden mot en kjørende server: faner, rulleminne, sticky, bunnark, sveip med ekte berøring, Dynamic Type, ikonmerke, kalender (tilpass rutene) |
-| `nyversjon-e2e.mjs <appmappe> <port>` | ende til ende: app oppe, «ny utrulling», sida bytter selv ved forgrunn, «Hent den» under bruk (tilpass miljøvariablene i toppen) |
+| `nyversjon-e2e.mjs <appmappe> <datamappe> [port]` | ende til ende: app oppe, «ny utrulling», sida bytter selv ved forgrunn, «Hent den» under bruk (tilpass miljøvariablene i toppen) |
 | `skall-til-sw.mjs <dist> <sw.js>` | ikke en test, men bygget: hasher byggefilene til et cachenavn og skriver `CACHE` og `SKALL` inn i `sw.js`; feiler hvis plassholderne mangler (oppdatering.md avsnitt 6) |
 
 Sjekk at PNG-fila faktisk finnes og ikke er tom før du leser den. Ett verktøy meldte
