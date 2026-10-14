@@ -10,8 +10,9 @@ description: >-
 # Skriveverktøy til en agent i en liten app
 
 Utgangspunktet: en liten app med én server, delte data og en agent i en fane som
-hittil bare har lest. Nå skal den kunne endre noe. Ekte eksempel: `~/dev/reiseapp`
-— `agent/verktoy.js`, `agent/politikk.js`, `agent/reiseagent.js`, `test/agent.test.js`.
+hittil bare har lest. Nå skal den kunne endre noe. Eksemplene er fra en reiseapp
+med program, ønskeliste og pakkeliste, delt på `agent/verktoy.js`, `agent/politikk.js`,
+`agent/reiseagent.js` og `test/agent.test.js`.
 
 Skrivingen er ikke det vanskelige. **Tilliten er det vanskelige.** En agent som
 endrer delte data uten et bekreftelsessteg kan gjøre noe helt riktig og likevel
@@ -181,7 +182,7 @@ Feilmeldingen er prompt. Sier den *hva* som er galt og *hva* agenten skal gjøre
 retter den seg selv eller spør. Sier den bare «ugyldig dato», prøver den en ny gjetning.
 
 **Velg et smalt utvalg verktøy.** Speil ikke API-et. Gi agenten det brukeren ba om og
-ikke mer, og skriv begrunnelsen i koden. I reiseapp kan agenten legge til, rette og
+ikke mer, og skriv begrunnelsen i koden. I reiseappen kan agenten legge til, rette og
 hake av i alle listene, men bare *slette* i programmet — ønskelista og pakkelista
 vokser eller krysses av, og tømmes i appen av et menneske som ser hele lista. Det er
 lett å legge til et verktøy senere, og ubehagelig å ta et tilbake.
