@@ -66,10 +66,14 @@ melding.
 - Hent bare en adresse som står **ordrett** i en av brukerens to siste meldinger. Ikke
   kilder fra et søk, ikke lenker på en side, ikke adresser modellen setter sammen. Vil
   brukeren ha en av dem lest, ber agenten dem lime den inn.
-- Sammenlign i normalisert form: `new URL()` gir små bokstaver og punycode i vertsnavnet,
-  fjerner standardport og normaliserer prosentkoding; ta bort `#fragment`. Ellers
-  **ingen slingringsmonn**: ikke `/` til slutt, ikke `www.`. Ellers kan modellen bære
-  data i små variasjoner.
+- Sammenlign `new URL(x).href` for begge: små bokstaver og punycode i vertsnavnet, ingen
+  standardport, `.`/`..` løst opp i stien, og tegn som må kodes, kodet (prosentkoding
+  dekodes ikke). Ellers **ingen slingringsmonn**: ikke `/` til slutt, ikke `www.`,
+  query nøyaktig lik. **Hent den normaliserte adressen**, som da er lik brukerens, så
+  det modellen skrev, aldri når nettet.
+- Ta bort `#fragment` før sammenligning og henting. Det er trygt *her*: fragmentet
+  sendes aldri i en HTTP-forespørsel, og serveren kjører ikke sidas JavaScript. For
+  lenker i svaret gjelder det motsatte (under).
 - Nekt brukernavn og passord i URL-en og andre porter enn 80 og 443.
 - Et tak per tur (tre sider holdt).
 
@@ -146,9 +150,13 @@ Avgjør i klienten, som en ren funksjon, hvordan hver lenke fra modellen vises:
 
 - Interne lenker (`#/…`) som før.
 - Bare `http:` og `https:`; alt annet blir tekst.
-- **Klikkbar bare når den eksakte URL-en er autorisert:** den står, normalisert som i
-  regel 2, i en av brukerens egne meldinger i tråden. Serveren kan sende med lista over
-  autoriserte adresser, så klienten slipper å tolke tråden selv.
+- **Klikkbar bare når den eksakte URL-en er autorisert:** `new URL(x).href` er lik for
+  modellens lenke og en adresse i en av brukerens egne meldinger i tråden, **med
+  fragmentet**. I nettleseren kan sidas JavaScript lese `#balance=12345` og sende det
+  videre, så `https://example.org/#…` er ikke den samme lenken som
+  `https://example.org/`. Lenken som åpnes, er brukerens egen adresse fra lista, ikke
+  modellens tekst. Serveren kan sende med lista over autoriserte adresser, så klienten
+  slipper å tolke tråden selv.
 - Alt annet vises som **ikke-klikkbar tekst**, hele adressen, med det ekte vertsnavnet
   fra `new URL(href).hostname` (punycode, `xn--…`, så et kyrillisk navn ikke ligner det
   ekte). Vil brukeren åpne den, viser et trykk hele adressen i et ark og åpner først
@@ -211,7 +219,8 @@ innover nektes:
   kall i stedet, assert at konteksten det fikk bare inneholder brukerens meldinger.
 - **Lenker og bilder** som ren funksjon: `https://angriper.no/12345`,
   `https://saldo-12345.angriper.no/` og en lenke med query blir tekst; den samme
-  adressen er klikkbar når den står i en brukermelding; `![](https://…)` tegnes aldri,
+  adressen er klikkbar når den står i en brukermelding; `https://example.org/#x=1` er
+  tekst når brukeren bare skrev `https://example.org/`; `![](https://…)` tegnes aldri,
   `![](/mini/<id>)` gjør det.
 - SSRF-sperren som rene funksjoner: én test per adresseform over, og et `lookup` som
   svarer offentlig første gang og privat andre gang.
