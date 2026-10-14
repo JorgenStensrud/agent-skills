@@ -102,19 +102,11 @@ appen: tailnettet er grensen; hold den utenfor en offentlig reverse proxy.
   `content-length` og etter `arrayBuffer()`; én miljøvariabel skrur hele vakten av i test.
   Filnavn fra høstede felt går gjennom en slug, aldri feltet.
 - **DNS-rebinding** (navnet svarer offentlig ved sjekken og privat ved tilkoblingen)
-  stenges bare ved å sjekke adressen det faktisk kobles til. Ikke `fetch`: hent over
-  `node:http(s)` med et eget `lookup` som slår opp navnet, nekter hvis *noen* av
-  adressene er private, og gir tilkoblingen nettopp de sjekkede adressene. En IP i
-  URL-en slås ikke opp, så den sjekkes for seg. `agent: false` gir en fersk agent per
-  forespørsel: ingen gjenbrukt forbindelse, og ingen proxy fra miljøet
-  (`HTTP_PROXY`/`NODE_USE_ENV_PROXY` gjelder den globale agenten). IPv6 i alle former
-  må med: IPv4-mappet (`::ffff:7f00:1` er 127.0.0.1), NAT64 `64:ff9b::/96`, 6to4
-  `2002::/16` og Teredo `2001::/32` bærer en IPv4-adresse inni; enklest er å nekte alt
-  utenfor `2000::/3` og sjekke de innbakte IPv4-adressene. La URL-tolkeren normalisere
-  desimale og heksadesimale IP-er (`http://2130706433/`, `0x7f.1`) før sjekken.
-- **Les kroppen som strøm med tak**, ikke `arrayBuffer()` og så mål: avbryt når taket
-  er nådd, og pakk ut gzip/brotli selv med samme tak på det utpakkede, ellers er en
-  liten gzip-bombe nok.
+  stenges bare ved å sjekke adressen det faktisk kobles til: hent over `node:http(s)`
+  med et eget `lookup` og `agent: false`, ikke `fetch`. IPv6 i alle former må med
+  (IPv4-mappet, NAT64, 6to4, Teredo). **Les kroppen som strøm med tak**, og pakk ut
+  gzip selv med samme tak, ellers er en liten gzip-bombe nok. Hele sperren: skillen
+  `agent-i-appen`, reference/fremmed-tekst.md («SSRF-sperren»).
 - **LLM-JSON må ikke spres sist** over betrodde felt (`{ kode, url, ...json }`): modellens
   svar kan overskrive `url` med `javascript:`; plukk felt eksplisitt, og la `el()`/en
   `trygtHref` avvise alt annet enn `https?:`, `#/`, `tel:`, `mailto:` — seed-data går utenom
