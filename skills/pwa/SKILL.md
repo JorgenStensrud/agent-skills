@@ -29,7 +29,7 @@ forkastet — ikke gjenta det.
 | Deploy, versjon, rullback, HTTPS uten offentlig adresse, systemd, ytelse på dårlig nett, delte data, sikkerhetskopi | [reference/drift.md](reference/drift.md) |
 | Design som holder i sol: få bokser, lister som ikke er 30 000 px, kontrast målt, ikoner, tomtilstander | [reference/design.md](reference/design.md) |
 | Kart: Leaflet lat, fliser offline, klynger, posisjonsknapp, egne SVG-kart fra ekte geometri | [reference/kart.md](reference/kart.md) |
-| En agent i appen: Pi-sesjon på serveren, Max-innlogging som «ser ut som Claude Code», skrivepolitikk, kontekst-trimming, verktøy som alltid er «usikre» | [reference/agent-i-appen.md](reference/agent-i-appen.md) |
+| En agent i appen: Pi-sesjon på serveren, Max-innlogging som «ser ut som Claude Code», skrivepolitikk, kontekst-trimming, verktøy som alltid er «usikre», nettlesing | skillen `agent-i-appen` (`skills/agent-i-appen/`) |
 
 ## De tolv reglene som kostet mest å lære
 

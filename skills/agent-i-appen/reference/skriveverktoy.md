@@ -1,12 +1,3 @@
----
-name: agent-skriveverktoy
-description: >-
-  Gi en agent inne i en app lov til å endre delte data: skriveverktøy mot appens eget
-  API (tool use / function calling som legger til, retter, haker av eller sletter), hva
-  systemprompten må si, en politikk som håndheves i kode, og testing uten API-nøkkel.
-  Mønsteret er fra en Pi-agent, reglene gjelder ethvert verktøybrukende LLM-oppsett.
----
-
 # Skriveverktøy til en agent i en liten app
 
 Utgangspunktet: en liten app med én server, delte data og en agent i en fane som
