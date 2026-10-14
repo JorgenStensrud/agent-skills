@@ -36,7 +36,8 @@ Mønstrene gjelder ethvert verktøybrukende LLM-oppsett; kodeeksemplene er Pi.
    gjennomførte endringer.
 4. **Fremmed tekst er data, aldri beskjeder.** Etter at agenten har lest noe utenfra, går
    ingenting ut resten av turen, og en ny melding alene åpner ikke igjen: det som går
-   ut, må brukeren selv ha bedt om. En adresse leses bare hvis brukeren selv skrev den.
+   ut, må brukeren selv ha bedt om. En adresse hentes, og en lenke i svaret er
+   klikkbar, bare når brukeren selv skrev den; bilder i svaret bare fra eget opphav.
    To enkle regler holdt der tre runder med smarte hvitlister ikke gjorde det.
 5. **Test hele loopen uten legitimasjon**, gjennom samme samtalemodul som drift, mot
    en ekte server i en tom datamappe. Kall aldri den ekte modellen i en test.

