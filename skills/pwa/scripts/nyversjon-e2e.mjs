@@ -9,8 +9,28 @@ const [D, T, PORT = '3404'] = process.argv.slice(2);
 if (!D || !T) { console.error('bruk: node nyversjon-e2e.mjs <appmappe> <datamappe> [port]'); process.exit(1); }
 const BASIS = `http://127.0.0.1:${PORT}`;
 const MILJO = { PORT, APP_DATA: T, APP_INGEN_VARSLER: '1' };   // appens egne variabler
-let server;
 const vent = (ms) => new Promise((r) => setTimeout(r, ms));
+const versjonNaa = async () => { try { return (await (await fetch(BASIS + '/api/versjon')).json()).versjon ?? null; } catch { return undefined; } };
+// Skriptet eier serveren: én prosess startes før første navigering og startes på nytt
+// ved hver utrulling. Svarer noe alt på porten, er det en annen server, og da stopper vi.
+let server;
+async function startServer(versjon) {
+  server = spawn(process.execPath, ['server.js'], { cwd: D, env: { ...process.env, ...MILJO }, stdio: 'ignore' });
+  const ferdig = new Promise((r) => server.once('exit', r));
+  for (let i = 0; i < 40; i++) {
+    const v = await versjonNaa();
+    if (v !== undefined && (versjon === undefined || v === versjon)) return;
+    if (server.exitCode !== null) break;
+    await vent(250);
+  }
+  server.kill(); await ferdig;
+  throw new Error(`serveren i ${D} svarte ikke på ${BASIS}/api/versjon`);
+}
+async function stoppServer() {
+  if (!server || server.exitCode !== null) return;
+  const ferdig = new Promise((r) => server.once('exit', r));
+  server.kill(); await ferdig;
+}
 async function rullUt(versjon, cache) {
   // «Ny utrulling»: ny versjonsstreng i versjon.txt og index.html, nytt cachenavn i sw.js, og omstart.
   fs.writeFileSync(path.join(D, 'versjon.txt'), versjon + '\n');
@@ -18,11 +38,11 @@ async function rullUt(versjon, cache) {
   fs.writeFileSync(ix, fs.readFileSync(ix, 'utf8').replace(/name="versjon" content="[^"]*"/, `name="versjon" content="${versjon}"`));
   const sw = path.join(D, 'public/sw.js');
   fs.writeFileSync(sw, fs.readFileSync(sw, 'utf8').replace(/const CACHE = '[^']*'/, `const CACHE = '${cache}'`));
-  server?.kill();
-  await vent(800);
-  server = spawn(process.execPath, ['server.js'], { cwd: D, env: { ...process.env, ...MILJO }, stdio: 'ignore' });
-  for (let i = 0; i < 40; i++) { try { const j = await (await fetch(BASIS + '/api/versjon')).json(); if (j.versjon === versjon) break; } catch {} await vent(250); }
+  await stoppServer();
+  await startServer(versjon);
 }
+if ((await versjonNaa()) !== undefined) { console.error(`noe svarer alt på ${BASIS}; stopp det eller velg en annen port`); process.exit(1); }
+await startServer();
 const DEV = 9200 + Math.floor(Math.random()*60);
 const profil = fs.mkdtempSync(path.join(os.tmpdir(),'chrome-nv-'));
 const chrome = spawn(finnChrome(),['--headless=new','--disable-gpu','--disable-extensions','--no-sandbox',`--remote-debugging-port=${DEV}`,`--user-data-dir=${profil}`,'about:blank'],{stdio:'ignore'});
@@ -56,4 +76,4 @@ let etter2; for (let i=0;i<60;i++){ await vent(500); etter2 = await tilstand(); 
 ut.etterHentDen = { ...etter2, lastinger };
 ut.unntak = feil.slice(0,3);
 console.log(JSON.stringify(ut,null,1));
-ws.close(); chrome.kill(); server?.kill(); try{fs.rmSync(profil,{recursive:true,force:true});}catch{}
+ws.close(); chrome.kill(); await stoppServer(); try{fs.rmSync(profil,{recursive:true,force:true});}catch{}
