@@ -40,11 +40,15 @@ er tom eller ødelagt:
 self.addEventListener('push', (e) => {
   let d = {};
   try { d = e.data ? e.data.json() : {}; } catch { d = { tekst: e.data?.text?.() || '' }; }
-  e.waitUntil(self.registration.showNotification(d.tittel || 'App', {
-    body: d.tekst || '', icon: '/ikon-192.png', badge: '/ikon-192.png',
-    tag: d.nokkel || 'app',            // samme sak erstatter, legger seg ikke oppå
-    data: { url: d.url || '#/' },
-  }));
+  const tag = d.nokkel || 'app';
+  // Samme sak skal erstatte det forrige varselet, men iOS gjør det ikke selv ut fra
+  // `tag` (WebKit-feil 258922). Lukk de gamle med samme tag først.
+  e.waitUntil(self.registration.getNotifications({ tag })
+    .then((gamle) => gamle.forEach((v) => v.close()), () => {})
+    .then(() => self.registration.showNotification(d.tittel || 'App', {
+      body: d.tekst || '', icon: '/ikon-192.png', badge: '/ikon-192.png',
+      tag, data: { url: d.url || '#/' },
+    })));
 });
 ```
 
@@ -82,18 +86,43 @@ når en ny utløser aldri dem som alt abonnerer). Testes uten nettverk.
 
 ## Abonnementet
 
-- Serveren godtar bare `endpoint` som er en URL hos en ekte pushtjeneste
-  (`push.apple.com`, `googleapis.com`, `push.services.mozilla.com`,
-  `notify.windows.com`), høyst 1000 tegn — ellers kan hvem som helst få serveren til å
-  POST-e til hva som helst. Sjekken «begynner på https://» stoppet ikke
-  `https://100.99.4.33/` eller `https://127.0.0.1:7666/`; hvitlisten er på **vertsnavn**
-  med tester for `push.apple.com.angriper.no` og `evilgoogleapis.com` (en naiv
-  delstrengsjekk slipper begge gjennom). Samme SSRF-mønster gjelder alt som tar imot en
-  adresse utenfra (hente PDF, hente bilde).
+- Serveren godtar bare `endpoint` som er en URL hos en ekte pushtjeneste, høyst 1000
+  tegn — ellers kan hvem som helst få serveren til å POST-e til hva som helst. Sjekken
+  «begynner på https://» stoppet ikke `https://100.99.4.33/` eller
+  `https://127.0.0.1:7666/`. Hvitlisten er på **vertsnavn**, sjekket før lagring og før
+  sending:
+  - eksakte verter (`web.push.apple.com`, `fcm.googleapis.com`,
+    `updates.push.services.mozilla.com`) pluss bestemte underverter med punktum foran
+    (`.push.apple.com`, `.notify.windows.com`), der verten må være lengre enn suffikset;
+  - `https:` og ingen port, brukernavn eller passord i URL-en;
+  - **ikke** et suffiks som `googleapis.com`: det slipper gjennom alle Googles API-er.
+  Test `push.apple.com.angriper.no`, `evilgoogleapis.com` og
+  `https://web.push.apple.com:8443/` (en naiv delstrengsjekk slipper de to første
+  gjennom). Samme SSRF-mønster gjelder alt som tar imot en adresse utenfra (hente PDF,
+  hente bilde).
 - Samme `endpoint` igjen = oppdater valgene, ikke nytt abonnement.
 - **404/410** fra pushtjenesten betyr dødt abonnement (appen avinstallert, tillatelse
   trukket): fjern det.
-- `TTL: 3600, urgency: 'normal'`.
+- **`urgency` og `TTL` per type**, ikke fast. Det tidskritiske (en frist, en
+  påminnelse) sendes med `urgency: 'high'`, fordi Apple kan holde igjen `normal` til
+  telefonen våkner av seg selv; det er en begrunnet antakelse, ikke målt. TTL kort for
+  påminnelser (en time; for sent er verdiløst) og lengre for oversikter (et halvt døgn).
+
+## Abonnementet holdes i live
+
+- **Feil nøkkel:** har telefonen et abonnement laget med en annen `applicationServerKey`
+  enn serverens nåværende (nye VAPID-nøkler, ny server), `unsubscribe()` og abonner på
+  nytt. Sammenlign bytene i `ab.options.applicationServerKey` med nøkkelen.
+- **Meld fra på nytt ved hver oppstart**, når telefonen har et abonnement: serveren
+  behandler samme `endpoint` som en oppdatering, så det er gratis, og en server som
+  har mistet det, får det tilbake.
+- **`pushsubscriptionchange`** i service workeren: abonner på nytt med samme nøkkel og
+  send det nye abonnementet med det gamle endepunktet (`erstatter`), så serveren
+  bytter i stedet for å legge til. Fornyingen ved oppstart finnes fordi iOS kanskje
+  ikke fyrer hendelsen.
+- **Service workeren kan ikke lese `localStorage`.** Det den trenger for å melde fra
+  (hvem telefonen tilhører), skrives av siden til en liten egen cache
+  (`caches.open('app-meg')` → `put('/meg', new Response(navn))`) og leses der.
 
 ## Varsler med innhold fra en agent
 
@@ -118,3 +147,7 @@ nyttelast, utløserne, dedupe — er testet uten telefon.
 
 `navigator.setAppBadge(n)` med noe brukeren kan gjøre noe med (ugjorte punkter i
 dag), oppdatert ved hver visning. `clearAppBadge` når null.
+
+Merket er et produktvalg, ikke en regel. Et tall som bare vokser, blir støy; en annen
+app valgte å rydde merket ved hver push (`clearAppBadge` i push-handleren) og la
+varselet selv bære beskjeden.

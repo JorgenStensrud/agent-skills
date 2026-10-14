@@ -1,9 +1,15 @@
 // Ende til ende: appen står oppe med service worker, en ny versjon rulles ut, og
 // sida skal bytte av seg selv ved forgrunn — og vise «Hent den» under bruk.
-import { spawn, execSync } from 'node:child_process'; import fs from 'node:fs'; import os from 'node:os'; import path from 'node:path';
-const BASIS = 'http://127.0.0.1:3404';
-const D = fs.readFileSync('/tmp/deploytest.dir', 'utf8').trim();
-const T = fs.readFileSync('/tmp/t4data.dir', 'utf8').trim();
+// Bruk: node nyversjon-e2e.mjs <appmappe> <datamappe> [port]
+// <appmappe> er en kopi av appen (skriptet skriver i den), <datamappe> en tom datamappe.
+// Tilpass MILJO, stiene til index.html og sw.js, og velgerne i tilstand() til appen.
+import { spawn } from 'node:child_process'; import fs from 'node:fs'; import os from 'node:os'; import path from 'node:path';
+import { finnChrome } from './chrome.mjs';
+const [D, T, PORT = '3404'] = process.argv.slice(2);
+if (!D || !T) { console.error('bruk: node nyversjon-e2e.mjs <appmappe> <datamappe> [port]'); process.exit(1); }
+const BASIS = `http://127.0.0.1:${PORT}`;
+const MILJO = { PORT, APP_DATA: T, APP_INGEN_VARSLER: '1' };   // appens egne variabler
+let server;
 const vent = (ms) => new Promise((r) => setTimeout(r, ms));
 async function rullUt(versjon, cache) {
   // «Ny utrulling»: ny versjonsstreng i versjon.txt og index.html, nytt cachenavn i sw.js, og omstart.
@@ -12,14 +18,14 @@ async function rullUt(versjon, cache) {
   fs.writeFileSync(ix, fs.readFileSync(ix, 'utf8').replace(/name="versjon" content="[^"]*"/, `name="versjon" content="${versjon}"`));
   const sw = path.join(D, 'public/sw.js');
   fs.writeFileSync(sw, fs.readFileSync(sw, 'utf8').replace(/const CACHE = '[^']*'/, `const CACHE = '${cache}'`));
-  try { execSync(`kill $(ss -ltnp | grep ':3404 ' | grep -o 'pid=[0-9]*' | cut -d= -f2)`); } catch {}
+  server?.kill();
   await vent(800);
-  spawn(process.execPath, ['server.js'], { cwd: D, env: { ...process.env, PORT: '3404', REISEAPP_DATA: T, REISEAPP_INGEN_OPPVARMING: '1', REISEAPP_INGEN_VARSLER: '1' }, stdio: 'ignore', detached: true }).unref();
+  server = spawn(process.execPath, ['server.js'], { cwd: D, env: { ...process.env, ...MILJO }, stdio: 'ignore' });
   for (let i = 0; i < 40; i++) { try { const j = await (await fetch(BASIS + '/api/versjon')).json(); if (j.versjon === versjon) break; } catch {} await vent(250); }
 }
 const DEV = 9200 + Math.floor(Math.random()*60);
 const profil = fs.mkdtempSync(path.join(os.tmpdir(),'chrome-nv-'));
-const chrome = spawn('/usr/bin/google-chrome',['--headless=new','--disable-gpu','--disable-extensions','--no-sandbox',`--remote-debugging-port=${DEV}`,`--user-data-dir=${profil}`,'about:blank'],{stdio:'ignore'});
+const chrome = spawn(finnChrome(),['--headless=new','--disable-gpu','--disable-extensions','--no-sandbox',`--remote-debugging-port=${DEV}`,`--user-data-dir=${profil}`,'about:blank'],{stdio:'ignore'});
 let liste; for(let i=0;i<50;i++){try{liste=await (await fetch(`http://127.0.0.1:${DEV}/json/list`)).json();if(liste.length)break;}catch{}await vent(200);}
 const ws=new WebSocket(liste.find(t=>t.type==='page').webSocketDebuggerUrl); await new Promise(r=>(ws.onopen=r));
 let id=0; const v=new Map(); let lastinger=0; const feil=[];
@@ -34,13 +40,13 @@ const ut = {};
 await kall('Page.navigate',{url:BASIS+'/#/praktisk'}); await vent(6000);
 ut.start = await tilstand();
 // 2. Ny utrulling; appen «kommer i forgrunnen» → skal laste seg selv på nytt
-await rullUt('v2test · 2026-09-15', 'reiseapp-v99');
+await rullUt('v2test · 2026-09-15', 'app-v99');
 lastinger = 0;
 await ev("Object.defineProperty(document,'visibilityState',{value:'visible',configurable:true}); document.dispatchEvent(new Event('visibilitychange'))");
 let etter; for (let i=0;i<60;i++){ await vent(500); etter = await tilstand(); if (etter.meta?.startsWith('v2test')) break; }
 ut.etterForgrunn = { ...etter, lastinger };
 // 3. Enda en utrulling; oppdaget under bruk (sjekken uten auto) → melding, ingen omlasting
-await rullUt('v3test · 2026-09-16', 'reiseapp-v100');
+await rullUt('v3test · 2026-09-16', 'app-v100');
 lastinger = 0;
 await ev("import('/app.js').then(m=>m.sjekkVersjon({auto:false}))"); await vent(1500);
 ut.underBruk = { ...(await tilstand()), lastinger };
@@ -50,4 +56,4 @@ let etter2; for (let i=0;i<60;i++){ await vent(500); etter2 = await tilstand(); 
 ut.etterHentDen = { ...etter2, lastinger };
 ut.unntak = feil.slice(0,3);
 console.log(JSON.stringify(ut,null,1));
-ws.close(); chrome.kill(); try{fs.rmSync(profil,{recursive:true,force:true});}catch{}
+ws.close(); chrome.kill(); server?.kill(); try{fs.rmSync(profil,{recursive:true,force:true});}catch{}
