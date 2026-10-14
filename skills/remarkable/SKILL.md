@@ -23,7 +23,7 @@ need no pinch-zooming. PDFs upload untouched.
 
 ```bash
 skills/remarkable/send.sh <file.pdf|file.html|file.md|URL> \
-    [--name "Title"] [--tag jobb|personlig|seeyou] [--folder /Claude] [--no-date]
+    [--name "Title"] [--tag <name>] [--folder /Claude] [--no-date]
 skills/remarkable/send.sh --auth <one-time-code>    # first run only
 skills/remarkable/send.sh <file> --preview          # PNGs at 226 DPI, no upload
 skills/remarkable/send.sh <file> --name "Budsjett" --no-date --replace  # update in place
@@ -52,17 +52,21 @@ with `YYYY-MM-DD ` is left alone; `--no-date` skips the prefix entirely.
 ## Tags
 
 `--tag` sets real reMarkable document tags — the ones the tablet's own tag
-filter sees. Three are allowed; anything else is rejected, so the vocabulary
-stays a vocabulary:
+filter sees. The vocabulary is the user's own and lives outside the repo, in
+`~/.config/remarkable/tags`: one line per name, the name first and then the
+tags it sets.
 
-| `--tag` | Tags set |
-|---------|----------|
-| `jobb` | `jobb` |
-| `personlig` | `personlig` |
-| `seeyou` | `seeyou` **and** `jobb` |
+```
+# ~/.config/remarkable/tags
+jobb      jobb
+personlig personlig
+kunde     kunde jobb     # a narrower tag implies the broader one
+```
 
-**`seeyou` implies `jobb`** — SeeYou work is work. Pass `--tag seeyou` alone;
-never pass both.
+With the file, only listed names are accepted, so the vocabulary stays a
+vocabulary; pass the most specific name alone, never a parent alongside it.
+Without the file, `--tag <name>` sets that one tag. Read the file before
+choosing a tag; comments in it say what each name is for.
 
 Ask which tag applies when it isn't obvious from context. Tags and `--folder`
 are independent — tags classify, folders file.
@@ -87,8 +91,7 @@ are independent — tags classify, folders file.
    `"orientation": "landscape"` in `.content`, which both fills the screen when
    the tablet is turned and keeps pen strokes aligned with the page under them.
 5. **Confirm before sending personal or sensitive content** — uploads go to
-   reMarkable's servers. (The user has approved this for good: anything may go
-   to their own reMarkable without asking.)
+   reMarkable's servers.
 6. **Look at every page before you upload.** `send.sh <file> --preview` renders
    each page at the tablet's 226 DPI without uploading. Read every PNG. Nothing
    may be cut off: text clipped in a cell, a word broken mid-word, a missing

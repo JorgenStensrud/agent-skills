@@ -10,8 +10,9 @@ description: >-
 # Skriveverktøy til en agent i en liten app
 
 Utgangspunktet: en liten app med én server, delte data og en agent i en fane som
-hittil bare har lest. Nå skal den kunne endre noe. Ekte eksempel: `~/dev/reiseapp`
-— `agent/verktoy.js`, `agent/politikk.js`, `agent/reiseagent.js`, `test/agent.test.js`.
+hittil bare har lest. Nå skal den kunne endre noe. Eksemplene er fra en reiseapp
+med program, ønskeliste og pakkeliste, delt på `agent/verktoy.js`, `agent/politikk.js`,
+`agent/reiseagent.js` og `test/agent.test.js`.
 
 Skrivingen er ikke det vanskelige. **Tilliten er det vanskelige.** En agent som
 endrer delte data uten et bekreftelsessteg kan gjøre noe helt riktig og likevel
@@ -27,12 +28,8 @@ JSON-fila som serveren bruker. Ikke gjør det.
 tur.plan.push({ id: nyId(), dato, tekst });
 lagre();
 
-// ja
-await fetch(`${basisUrl}/api/turer/${turId}/plan`, {
-  method: 'POST',
-  headers: { 'Content-Type': 'application/json' },
-  body: JSON.stringify({ dato, tekst }),
-});
+// ja — api() står i punkt 2
+await api('POST', `/api/turer/${turId}/plan`, { dato, tekst });
 ```
 
 Fire grunner, i rekkefølge:
@@ -48,8 +45,13 @@ Fire grunner, i rekkefølge:
    verktøyene mot den. Se punkt 6.
 
 Motforestillingen — «det er et HTTP-kall til oss selv» — er riktig og uten
-betydning. Det er localhost, det er millisekunder, og det er én kodesti i stedet for
-to.
+betydning. Det er localhost og én kodesti i stedet for to.
+
+**Men ikke med `fetch` når agenten kjører i serverprosessen.** Pi bytter ut den
+globale dispatcheren som `fetch` bruker når den lastes, og kall til localhost ble
+liggende og vente: målt i samme prosess tok `fetch` 1–2 sekunder og `node:http` 2
+millisekunder. Bruk `node:http` (punkt 2). Det er fortsatt vanlig HTTP mot de samme
+rutene som appen bruker.
 
 ## 2. Formen på et verktøy
 
@@ -97,15 +99,34 @@ i et vellykket resultat, må modellen *lese* seg til det, og noen ganger gjør d
 det.
 
 ```js
-async function api(metode, sti, kropp) {
-  const svar = await fetch(basisUrl + sti, { method: metode, ... });
-  if (!svar.ok) {
-    // Serveren svarer { feil: '...' }. Den setningen er mer nyttig for modellen
-    // enn statuskoden, så den blir feilmeldingen.
-    const kropp = await svar.json().catch(() => null);
-    throw new Error(kropp?.feil || `${metode} ${sti} feilet: HTTP ${svar.status}`);
-  }
-  return svar.status === 204 ? null : svar.json();
+import http from 'node:http';
+
+// node:http, ikke fetch: se punkt 1.
+function api(metode, sti, kropp) {
+  const data = kropp === undefined ? undefined : JSON.stringify(kropp);
+  return new Promise((ok, feil) => {
+    const req = http.request(basisUrl + sti, {
+      method: metode,
+      headers: { 'Content-Type': 'application/json' },
+    }, (res) => {
+      let tekst = '';
+      res.setEncoding('utf8');
+      res.on('data', (bit) => (tekst += bit));
+      res.on('error', feil);   // brutt etter headerne: ellers henger løftet
+      res.on('end', () => {
+        if (res.statusCode === 204) return ok(null);
+        let svar, json = true;
+        try { svar = JSON.parse(tekst); } catch { json = false; }
+        // Serveren svarer { feil: '...' }. Den setningen er mer nyttig for modellen
+        // enn statuskoden, så den blir feilmeldingen.
+        if (res.statusCode >= 400) return feil(new Error((json && svar?.feil) || `${metode} ${sti} feilet: HTTP ${res.statusCode}`));
+        if (!json) return feil(new Error(`${metode} ${sti} svarte ikke med JSON (HTTP ${res.statusCode}).`));
+        ok(svar);
+      });
+    });
+    req.on('error', feil);
+    req.end(data);
+  });
 }
 ```
 
@@ -181,7 +202,7 @@ Feilmeldingen er prompt. Sier den *hva* som er galt og *hva* agenten skal gjøre
 retter den seg selv eller spør. Sier den bare «ugyldig dato», prøver den en ny gjetning.
 
 **Velg et smalt utvalg verktøy.** Speil ikke API-et. Gi agenten det brukeren ba om og
-ikke mer, og skriv begrunnelsen i koden. I reiseapp kan agenten legge til, rette og
+ikke mer, og skriv begrunnelsen i koden. I reiseappen kan agenten legge til, rette og
 hake av i alle listene, men bare *slette* i programmet — ønskelista og pakkelista
 vokser eller krysses av, og tømmes i appen av et menneske som ser hele lista. Det er
 lett å legge til et verktøy senere, og ubehagelig å ta et tilbake.
@@ -192,26 +213,36 @@ Dette er hele poenget med å skrive gjennom API-et: du kan teste det ordentlig.
 Pi har en faux-provider som spiller av svar du selv bestemmer, så loopen kjører ekte
 — ekte verktøy, ekte HTTP, ekte lagring — uten en eneste token.
 
+**Test gjennom den samme samtalemodulen som drift bruker**, ikke en rå `Agent` med
+`agent.prompt()`. Det er samtalemodulen som eier sesjonen (punkt 7), køen og id-ene
+til meldingene; tester som kalte modellen direkte, gikk grønt mens kø- og id-feilene
+nådde telefonene.
+
 ```js
-import { createModels, fauxProvider, fauxAssistantMessage, fauxToolCall, fauxText }
-  from '@earendil-works/pi-ai';
+import { fauxProvider, fauxAssistantMessage, fauxToolCall, fauxText } from '@earendil-works/pi-ai';
+import { ModelRuntime } from '@earendil-works/pi-coding-agent';
 
+const kjoretid = await ModelRuntime.create({ credentials, modelsPath: null, allowModelNetwork: false });
 const faux = fauxProvider({ tokensPerSecond: 10000 });
-const models = createModels();
-models.setProvider(faux.provider);
+kjoretid.registerNativeProvider(faux.provider);
 
-const agent = lagAgent({ models, model: faux.getModel(), basisUrl: BASE, turId });
+// lagSesjon og lagSamtaler er appens egne: de samme funksjonene serveren kaller.
+const samtaler = lagSamtaler({
+  lagSesjonFor: () => lagSesjon({ modelRuntime: kjoretid, model: faux.getModel(), basisUrl: BASE, turId }),
+});
 faux.setResponses([
   fauxAssistantMessage([fauxToolCall('legg_til_i_programmet',
     { dato: '2026-09-14', tekst: 'Ferje til Limone 10.30' })], { stopReason: 'toolUse' }),
   fauxAssistantMessage([fauxText('Gjort.')]),
 ]);
-await agent.prompt('legg inn ferja på mandag');
+await samtaler.send(turId, 'legg inn ferja på mandag');
+await samtaler.ventTilRo(turId);
 ```
 
-Forutsetningen er at agentbyggeren tar `models` og `model` som **parametre** i stedet
-for å slå dem opp inni seg. Gjør den ikke det, kan den ikke testes; det er verdt
-refaktoreringen.
+Forutsetningen er at sesjonsbyggeren tar `modelRuntime` og `model` som **parametre**
+i stedet for å slå dem opp inni seg, og at samtalemodulen tar sesjonsbyggeren som
+parameter. Gjør de ikke det, kan de ikke testes; det er verdt refaktoreringen.
+`credentials` er en tom lagring i testens datamappe, så ingen ekte innlogging leses.
 
 Start en ekte server mot en midlertidig datamappe — `spawn(process.execPath,
 ['server.js'], { env: { ...process.env, PORT, <DATAVARIABELEN>: mkdtempSync(...) } })`,
@@ -284,8 +315,7 @@ og komprimering når tråden blir lang — begge deler du ellers hadde skrevet s
 `ModelRuntime.create({ credentials })` med en egen `CredentialStore` holder tokenet i
 appens datamappe, ikke i `~/.pi`.
 
-**Test politikken med faux-modellen** (punkt 6) — `modelRuntime.registerNativeProvider(faux.provider)`
-og la modellen «be om» sletting etter «rydd opp»: assert `isError` og at oppføringen
+**Test politikken med faux-modellen** gjennom samtalemodulen (punkt 6), og la modellen «be om» sletting etter «rydd opp»: assert `isError` og at oppføringen
 står. Så det samme etter «slett»: assert at den er borte. Og test at et verktøy som
 ikke finnes (`bash`) blokkeres, og at journalen får én linje per gjennomført endring
 og null for lesing og feil.
@@ -300,7 +330,8 @@ og null for lesing og feil.
 - [ ] Sletting slår opp oppføringen først
 - [ ] Grenseverdier avvises i kode, med grensen i feilmeldingen
 - [ ] Systemprompten har de seks reglene, og sier at de går foran
-- [ ] Tester mot faux-provider + ekte server, med assert på disk og på `isError`
+- [ ] Tester mot faux-provider + ekte server gjennom samme samtalemodul som drift,
+      med assert på disk og på `isError`
 - [ ] Utvalget av verktøy er begrunnet i en kommentar, ikke bare arvet fra API-et
 - [ ] Politikken er en `tool_call`-utvidelse: liste over tillatte verktøy, sletting
       bare på brukerens egne ord, journal over gjennomførte endringer

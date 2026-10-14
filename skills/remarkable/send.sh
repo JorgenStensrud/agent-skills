@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
 # Send a document to the reMarkable cloud: here -> tablet. read.sh goes the other way.
-# Usage: send.sh <file> [--name "Title"] [--tag jobb|personlig|seeyou] [--folder /Claude] [--no-date]
+# Usage: send.sh <file> [--name "Title"] [--tag <name>] [--folder /Claude] [--no-date]
 #                        [--replace] [--preview]
 # --preview renders every page at the tablet's 226 DPI and prints the PNGs; no upload.
 # --replace deletes earlier versions (same title, with or without date) first.
 #        send.sh --auth <one-time-code>     # one-time pairing
 # Names get a "YYYY-MM-DD " prefix so sorting by name on the tablet reads
 # chronologically. Pass --no-date to skip it. --tag sets real reMarkable
-# document tags; seeyou implies jobb.
+# document tags; ~/.config/remarkable/tags can map a name to several.
 # Exit: 2 not authenticated, 3 bad input, 4 render failed, 5 upload rejected
 set -euo pipefail
 
@@ -68,18 +68,26 @@ while [ $# -gt 0 ]; do
     *)  [ -z "$SRC" ] && SRC="$1" || { echo "send: one input at a time" >&2; exit 3; }; shift ;;
   esac
 done
-[ -n "$SRC" ] || { echo "usage: send.sh <file.pdf|file.html|file.md|URL> [--name \"Title\"] [--tag jobb|personlig|seeyou]" >&2; exit 3; }
+[ -n "$SRC" ] || { echo "usage: send.sh <file.pdf|file.html|file.md|URL> [--name \"Title\"] [--tag <name>]" >&2; exit 3; }
 case "$FOLDER" in /*) ;; *) FOLDER="/$FOLDER" ;; esac
 
-# Real reMarkable document tags. seeyou always implies jobb — SeeYou work is work.
-TAGS=""
-case "$(printf '%s' "$TAG" | tr 'A-Z' 'a-z')" in
-  "")        ;;
-  jobb)      TAGS="jobb" ;;
-  personlig) TAGS="personlig" ;;
-  seeyou)    TAGS="seeyou jobb" ;;
-  *) echo "send: unknown tag '$TAG' (want jobb, personlig, or seeyou)" >&2; exit 3 ;;
-esac
+# Real reMarkable document tags. The vocabulary is personal, so it lives outside
+# the repo: one line per name, "<name> <tag>...", the name and the tags it sets
+# ("kunde kunde jobb" makes --tag kunde set both). With the file, only listed
+# names are accepted. Without it, --tag sets the name as a single tag.
+TAGS_FILE="${XDG_CONFIG_HOME:-$HOME/.config}/remarkable/tags"
+# An array, so a tag with a space stays one tag and "*" is never globbed.
+TAGS=()
+if [ -n "$TAG" ] && [ -f "$TAGS_FILE" ]; then
+  vocab() { sed 's/#.*//' "$TAGS_FILE"; }   # comments may follow a line or fill it
+  read -ra TAGS <<< "$(vocab | awk -v t="$TAG" 'tolower($1) == tolower(t) {
+    n = $1; $1 = ""; sub(/^ +/, ""); print ($0 == "" ? n : $0); exit }')"
+  [ "${#TAGS[@]}" -gt 0 ] || {
+    echo "send: unknown tag '$TAG' (want one of: $(vocab | awk 'NF { print $1 }' | paste -sd, -))" >&2
+    exit 3; }
+elif [ -n "$TAG" ]; then
+  TAGS=("$TAG")
+fi
 
 ensure_rmapi || exit 2
 
@@ -171,17 +179,18 @@ PY
 fi
 
 UPLOAD="$PDF"
-if [ -n "$TAGS" ]; then
+if [ "${#TAGS[@]}" -gt 0 ]; then
   UPLOAD="$TMP/$NAME.rmdoc"
-  python3 "$HERE/mkrmdoc.py" "$PDF" "$UPLOAD" "$NAME" $TAGS >/dev/null \
+  python3 "$HERE/mkrmdoc.py" "$PDF" "$UPLOAD" "$NAME" "${TAGS[@]}" >/dev/null \
     || { echo "send: could not build .rmdoc wrapper" >&2; exit 4; }
 fi
 
 "$RMAPI" -ni put "$UPLOAD" "$FOLDER" >"$TMP/put.log" 2>&1 \
   || { echo "send: upload rejected — $(tail -1 "$TMP/put.log")" >&2; exit 5; }
 
-if [ -n "$TAGS" ]; then
-  echo "sent \"$NAME\" to $FOLDER tagged [${TAGS// /, }] — sync the tablet over wifi to see it"
+if [ "${#TAGS[@]}" -gt 0 ]; then
+  LIST="$(printf '%s, ' "${TAGS[@]}")"
+  echo "sent \"$NAME\" to $FOLDER tagged [${LIST%, }] — sync the tablet over wifi to see it"
 else
   echo "sent \"$NAME\" to $FOLDER — sync the tablet over wifi to see it"
 fi

@@ -18,7 +18,12 @@ selv kan endre, og en skrivepolitikk i kode. Referanse: `reiseapp/agent/`.
   `PI_MEMORY_EXIT_SUMMARY=0` (ellers koster hver disponert sesjon et modellkall).
 - `ModelRuntime.create({ modelsPath: null, allowModelNetwork: false })`: en utrulling skal
   ikke avhenge av en katalogtjeneste. Én kjøretid per prosess — to ville fornye tokenet
-  samtidig og slå hverandre ut. Modellen overstyres med miljøvariabel.
+  samtidig og slå hverandre ut. Modellen kan velges per bruker: lagre valget i appens
+  datamappe og gi sesjonsbyggeren modellen som parameter, så kan en tråd fortsette
+  på en annen modell enn den startet med.
+- **Ikke `fetch` mot egen server fra agentprosessen.** Pi bytter ut den globale
+  dispatcheren når den lastes, og kall til localhost tok 1–2 s mot 2 ms med
+  `node:http`. Se `agent-skriveverktoy` punkt 1.
 - OAuth-tokenet i `<data>/pi-auth.json` (0600, gitignored), skrevet atomisk, med en
   løftekjede som lås rundt `modify`. `getAuth('anthropic')` svarer `{ auth, source }` —
   nøkkelen ligger ett nivå ned; leste man ytterste nivå «virket søket aldri».
@@ -37,8 +42,11 @@ selv kan endre, og en skrivepolitikk i kode. Referanse: `reiseapp/agent/`.
   fra tidligere runder byttes med et merke (`hent_turen` er ~50 KB per runde), men
   `toolCallId`/`toolName` beholdes så paringen holder. Bilder bare i de to siste
   brukermeldingene.
-- Systemprompten lages én gang per sesjon og kan ikke bære klokka: legg «nå» (dato og
-  klokke i brukernes sone) i det verktøyet som hentes ved hvert spørsmål.
+- Systemprompten lages én gang per sesjon, og en sesjon kan leve i dagevis. Fersk
+  tilstand (dato og klokke i brukernes sone, og et kort utdrag av det appen viser nå)
+  legges inn med en `before_agent_start`-krok, som kjører før hver tur og returnerer
+  `{ systemPrompt: h.systemPrompt + '\n\nSlik står det til nå: …' }`. Hent med
+  tidsavbrudd og en kort cache, og la en del som feiler bare bli borte.
 - Det agenten får av data slankes bevisst: bildelister ut, men ett bilde per sted (så den
   kan vise det), vedlegg som `{ navn, url }` (så den kan lese billetten).
 - Bilder til modellen skaleres på serveren til 1568 px lengste side, JPEG 80, `.rotate()`
