@@ -14,9 +14,20 @@ set -euo pipefail
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 RMAPI="$HERE/bin/rmapi"
 RMAPI_VERSION="v0.0.35"
+# sha256 per asset, as listed on the GitHub release. A new version: change all four.
+rmapi_sha256() {
+  case "$1" in
+    rmapi-macos-arm64.zip)    echo fb55b6c782b83dc0ccbb236359d738727c4c600378feae920fcab505862f624a ;;
+    rmapi-macos-intel.zip)    echo 1afc2c4d73ddde60e22e0ff8d2bc737450dfcaeaa723eb6a3b863ac96cb2102c ;;
+    rmapi-linux-amd64.tar.gz) echo 117616151d11937446ead6972b0934f97155443087f8406141db38fd1ac8fb25 ;;
+    rmapi-linux-arm64.tar.gz) echo 645c170d8119b4dcb652cf79612e362fcb032dc0e5869ff520eec1324da39637 ;;
+  esac
+}
 
 ensure_rmapi() {
-  [ -x "$RMAPI" ] && return 0
+  # bin/rmapi.version records what was downloaded, so raising RMAPI_VERSION is
+  # enough: the next run fetches the new build.
+  [ -x "$RMAPI" ] && [ "$(cat "$RMAPI.version" 2>/dev/null)" = "$RMAPI_VERSION" ] && return 0
   mkdir -p "$HERE/bin"
   # The binary is gitignored, so it self-downloads per machine — this repo is
   # shared between a mac and a linux box.
@@ -33,11 +44,15 @@ ensure_rmapi() {
   curl -fsSL --max-time 120 \
     "https://github.com/ddvk/rmapi/releases/download/$RMAPI_VERSION/$asset" -o "$dl" \
     || { echo "send: could not download rmapi" >&2; return 1; }
+  local sum; sum="$( (sha256sum "$dl" 2>/dev/null || shasum -a 256 "$dl") | cut -d' ' -f1)"
+  [ "$sum" = "$(rmapi_sha256 "$asset")" ] \
+    || { echo "send: checksum mismatch for $asset — not installing it" >&2; rm -rf "$tmp"; return 1; }
   case "$asset" in
     *.zip)    unzip -o -q -d "$HERE/bin" "$dl" ;;
     *.tar.gz) tar -xzf "$dl" -C "$HERE/bin" ;;
   esac || { echo "send: could not unpack rmapi" >&2; return 1; }
   chmod +x "$RMAPI"
+  echo "$RMAPI_VERSION" > "$RMAPI.version"
   rm -rf "$tmp"
 }
 
@@ -49,7 +64,11 @@ if [ "${1:-}" = "--auth" ]; then
   ensure_rmapi || exit 2
   echo "$2" | "$RMAPI" ls / >/dev/null 2>&1 \
     || { echo "send: pairing failed — code may be expired or already used" >&2; exit 2; }
-  echo "paired. token stored in ~/Library/Application Support/rmapi"
+  case "$(uname -s)" in
+    Darwin) conf="$HOME/Library/Application Support/rmapi/rmapi.conf" ;;
+    *)      conf="${XDG_CONFIG_HOME:-$HOME/.config}/rmapi/rmapi.conf" ;;
+  esac
+  echo "paired. token stored in ${RMAPI_CONFIG:-$conf}"
   exit 0
 fi
 
@@ -167,9 +186,15 @@ def path(d):
     while d:
         parts.append(d["Metadata"]["visibleName"]); d = by_id.get(d["Metadata"]["parent"])
     return "/" + "/".join(reversed(parts))
+def alive(d):  # as in read.sh: a folder in the trash takes its documents with it
+    while d:
+        if d["Metadata"]["parent"] == "trash" or d["Metadata"].get("deleted"):
+            return False
+        d = by_id.get(d["Metadata"]["parent"])
+    return True
 for d in docs:
     m = d["Metadata"]
-    if m["type"] == "DocumentType" and not m.get("deleted") and m["parent"] != "trash" \
+    if m["type"] == "DocumentType" and alive(d) \
        and path(d).rsplit("/", 1)[0] == folder.rstrip("/") and undated(m["visibleName"]) == undated(name):
         print(m["visibleName"])
 PY

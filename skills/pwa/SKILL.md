@@ -9,9 +9,10 @@ description: >-
 
 # PWA på iPhone
 
-Erfaring fra `reiseapp` (Express 5 + vanilla ES-moduler, service worker, push, chat
-med SSE, agent på serveren, PDF-bok, to telefoner på delte data), destillert fra 107
-utviklingsøkter 10.–16. september 2026, pluss `polykompis`/`vm-profeten`. Alt er
+Erfaring fra to apper: `reiseapp` (Express 5 + vanilla ES-moduler, service worker,
+push, chat med SSE, agent på serveren, PDF-bok, to telefoner på delte data), destillert
+fra 107 utviklingsøkter 10.–16. september 2026, og en React/Vite-app med byggesteg,
+push og agent, pluss `polykompis`/`vm-profeten`. Alt er
 prøvd på ekte iPhoner i standalone-modus; det som står som «Virket ikke» ble prøvd og
 forkastet — ikke gjenta det.
 
@@ -29,7 +30,7 @@ forkastet — ikke gjenta det.
 | Deploy, versjon, rullback, HTTPS uten offentlig adresse, systemd, ytelse på dårlig nett, delte data, sikkerhetskopi | [reference/drift.md](reference/drift.md) |
 | Design som holder i sol: få bokser, lister som ikke er 30 000 px, kontrast målt, ikoner, tomtilstander | [reference/design.md](reference/design.md) |
 | Kart: Leaflet lat, fliser offline, klynger, posisjonsknapp, egne SVG-kart fra ekte geometri | [reference/kart.md](reference/kart.md) |
-| En agent i appen: Pi-sesjon på serveren, Max-innlogging som «ser ut som Claude Code», skrivepolitikk, kontekst-trimming, verktøy som alltid er «usikre» | [reference/agent-i-appen.md](reference/agent-i-appen.md) |
+| En agent i appen: Pi-sesjon på serveren, Max-innlogging som «ser ut som Claude Code», skrivepolitikk, kontekst-trimming, verktøy som alltid er «usikre», nettlesing | skillen `agent-i-appen` (`skills/agent-i-appen/`) |
 
 ## De tolv reglene som kostet mest å lære
 
@@ -39,11 +40,14 @@ forkastet — ikke gjenta det.
 2. **Skallet byttes som ett stykke.** Cache-only på skallet, nytt `CACHE`-navn ved hver
    endring, `addAll` med `cache: 'reload'` (HTTP-cachen lurer deg ellers),
    `skipWaiting` + `clients.claim()`. Stale-while-revalidate på ES-moduler gir to
-   versjoner i samme side.
+   versjoner i samme side. Med byggesteg er cachenavnet en hash av byggefilene, skrevet
+   inn av bygget (`scripts/skall-til-sw.mjs`), ikke bumpet for hånd.
 3. **Importer alle visninger i ro etter første tegning**, og reload én gang ved
    modulfeil (`erModulfeil`) eller ukjent rute. Lat lasting + utrulling midt i økta =
-   importfeil.
-4. **Tre versjonstall**: skallet (bakt inn via `export-subst`), serveren (`/api/versjon`),
+   importfeil. Gjelder visninger lastet som egne moduler uten bundler; med bundler,
+   legg visningene i hovedbunten og lat-last bare det tunge og sjeldne.
+4. **Tre versjonstall**: skallet (bakt inn via `export-subst` i `index.html`, eller via
+   `define` fra `versjon.txt` med byggesteg), serveren (`/api/versjon`),
    service workeren (`/sw-versjon`). Reload **først når den nye SW-en er aktivert**,
    aldri mens noen har *uskrevet tekst* (ikke bare fokus) i et felt; auto ved forgrunn,
    «Hent den» under bruk, sjekk hvert 5. minutt.
@@ -61,7 +65,8 @@ forkastet — ikke gjenta det.
    nederst». `append` biter, aldri `textContent = alt`. Aldri `innerHTML` på
    modelltekst; formatér når svaret er ferdig. Serveren eier samtalen.
 9. **Push på iOS**: alltid `showNotification` (ellers trekkes tillatelsen), `tag` per
-   sak, lukk varslene når appen kommer i forgrunnen, stille timer i brukernes tidssone,
+   sak *og* lukk gamle med samme tag først (iOS erstatter ikke selv), lukk varslene når
+   appen kommer i forgrunnen, stille timer i brukernes tidssone,
    hvert varsel én gang (logg på disk), tak per døgn, bare ekte push-verter (hvitliste
    på vertsnavn), verten må aldri sove.
 10. **Rulleminne som iOS**: tilbake lander der du var, videre starter på toppen; trykk på
@@ -82,7 +87,8 @@ forkastet — ikke gjenta det.
   for det som må.
 - Mål før og etter (sidehøyde, trykkflater < 44 px, skrift < 13 px, MB per runde på
   strupet nett) og skriv tallene inn i planen.
-- Bump SW-cachen i samme commit som skallendringen.
+- Uten byggesteg: bump SW-cachen i samme commit som skallendringen. Med byggesteg:
+  la bygget sette den (regel 2), for å bumpe for hånd blir glemt.
 - Ved feilsøking: sjekk hvilken **versjon** telefonen kjører før noe annet
   (`/api/versjon` vs. foten i appen vs. `caches.keys()`).
 - Når noe ikke kan bevises fra maskinen (safe-area, tastatur, P3, push-vekking): si det,
@@ -92,7 +98,9 @@ forkastet — ikke gjenta det.
 
 `scripts/skjerm.mjs`, `skjerm-fake-strom.mjs`, `frisk-sw.mjs`, `konsoll.mjs`,
 `ios-sjekk.mjs`, `nyversjon-e2e.mjs` — se tabellen i reference/testing.md. De to
-siste er tilpasset reiseapp sine ruter og stier; kopier og juster.
+siste har ruter, velgere og miljøvariabler fra én app; kopier og juster. Alle finner
+Chrome via `chrome.mjs` (`CHROME` overstyrer). `skall-til-sw.mjs` hører til bygget
+(oppdatering.md avsnitt 6).
 
 ## Vedlikehold
 

@@ -1,12 +1,3 @@
----
-name: agent-skriveverktoy
-description: >-
-  Gi en agent inne i en app lov til å endre delte data: skriveverktøy mot appens eget
-  API (tool use / function calling som legger til, retter, haker av eller sletter), hva
-  systemprompten må si, en politikk som håndheves i kode, og testing uten API-nøkkel.
-  Mønsteret er fra en Pi-agent, reglene gjelder ethvert verktøybrukende LLM-oppsett.
----
-
 # Skriveverktøy til en agent i en liten app
 
 Utgangspunktet: en liten app med én server, delte data og en agent i en fane som
@@ -38,6 +29,9 @@ Fire grunner, i rekkefølge:
    datoer på feil format. Skriver du utenom, må du gjenta alt — og glemme noe.
 2. **Ett sted skriver.** Holder serveren dataene i minnet og lagrer atomisk, blir en
    agent som skriver ved siden av en tapt oppdatering neste gang serveren lagrer.
+   Unntaket: mangler API-et en rute (et eksternt regneark appen bare leser), kan
+   verktøyet skrive direkte, men da må det selv gjøre det ruta ellers ville gjort —
+   journalføre endringen og tømme cachen appen leser fra.
 3. **Agenten ser det brukerne ser.** Leseverktøyet henter fra samme endepunkt som
    telefonene, med samme kuraterte innhold påført. Skriv samme vei, så er det ingen
    forskjell mellom det agenten tror den gjorde og det appen viser.
@@ -156,7 +150,7 @@ slettede objektet.
 
 ## 4. Hva systemprompten må si
 
-Skriv reglene inn som en egen bolk, og si uttrykkelig at de går foran. Disse seks er
+Skriv reglene inn som en egen bolk, og si uttrykkelig at de går foran. Disse sju er
 de som betyr noe:
 
 - **Hent tilstanden før du endrer noe.** Id-ene ligger der, og agenten skal vite hva
@@ -165,11 +159,18 @@ de som betyr noe:
   «et punkt»). Vis til `sammendrag`-setningen fra verktøyet.
 - **Slett aldri noe som ikke er uttrykkelig bedt om.** Navngi omskrivningene som
   *ikke* er fullmakt til å slette: «bytt ut», «flytt», «rydd opp».
-- **Finn aldri på oppføringer.** Foreslå gjerne — men vent på ja før du skriver.
+- **Finn aldri på oppføringer.** Foreslå gjerne — men vent på ja før du skriver. Det
+  som tydelig følger av bestillingen, er ikke å finne på: «legg inn ferja og middagen
+  etterpå» gir to punkter, ikke et spørsmål.
 - **Tvetydige datoer bekreftes, ikke gjettes.** «På lørdag», «i morgen», «neste gang
   vi er der». Regn ut, si hvilken dato du kom til, eller spør.
 - **Feiler et verktøy, si det rett ut** og si hva som ikke ble gjort. Aldri svar som
-  om endringen gikk gjennom.
+  om endringen gikk gjennom. Prøv én gang til på en annen måte før du gir opp.
+- **Si aldri at noe ikke står der uten å ha søkt i denne turen.** Agenten husker
+  gamle verktøyresultater, og «det finnes ikke» fra i går er feil i dag.
+
+Spør «skal jeg?» bare før det som ikke kan angres (sletting, noe som går ut av appen).
+Bekreftelse for alt er støy, og brukerne slutter å lese den.
 
 ## 5. Steng de farlige kantene i koden, ikke bare i prompten
 
@@ -260,6 +261,15 @@ appen sier `legg_til_i_programmet` til brukeren.
 
 **Kall aldri den ekte agenten i en test.** Den bruker et delt abonnement med kvote.
 
+Flere mønstre som fanget ekte feil:
+
+- **Flere `fauxToolCall` i samme svar**: politikken må tåle at alle kallene sjekkes før
+  noen av dem har kjørt (punkt 8).
+- **En falsk side med innsatte instrukser** («slett alt», «les denne adressen»): la
+  modellen gjøre det siden ber om, og assert at kallene blokkeres (fremmed-tekst.md).
+- **Alt utenfor appen går mot falske:** ferdighetene tar en injisert «kjører», så nett,
+  regneark og enheter aldri kalles på ekte (skillen `app-tjener`).
+
 ## 7. Politikken som utvidelse: håndhev i kode, før kallet
 
 Punkt 5 stenger kantene *inne i* hvert verktøy. Men «slett aldri noe de ikke har bedt
@@ -320,6 +330,79 @@ står. Så det samme etter «slett»: assert at den er borte. Og test at et verk
 ikke finnes (`bash`) blokkeres, og at journalen får én linje per gjennomført endring
 og null for lesing og feil.
 
+## 8. Når appen vokser: ferdigheter og politikk i fire nivåer
+
+Med mange verktøy blir hvitlisten, politikken og promptbolkene fort tre lister som
+glir fra hverandre. Bygg alle tre fra én liste:
+
+```ts
+type Ferdighet = {
+  navn: string;
+  prompt: string;                         // bolken i systemprompten
+  verktoy(ctx: { bruker: string; api: Api }): Tool[];
+  sletter?: string[];                     // krever et sletteord
+  krever?: Record<string, RegExp>;        // krever et utløserord: det som koster eller går ut av appen
+  bekrefter?: Record<string, Bekreftelse>;// forslag, så ja
+  vakter?: Record<string, Vakt>;          // ren funksjon (inn, samtaleutsnitt) → grunn | undefined
+};
+```
+
+Én fil per ferdighet, og en ferdighet kan skrus av med et miljøflagg. De fire nivåene:
+
+- **`sletter`**: sletteordet må stå i en av brukerens to siste meldinger.
+- **`krever`**: et utløserord for det som koster penger eller går ut av appen.
+- **`bekrefter`**: verktøyet utfører et forslag, og bare etter et ja (under).
+- **`vakter`**: en ren funksjon som sier nei med en grunn; testes uten modell.
+
+**Forslag og ja, håndhevet i kode.** Forslagsverktøyet returnerer en `forslagId`.
+Utførelsen kjører bare når:
+
+- jaet kom i en *senere* brukermelding enn forslaget (et ja i selve bestillingen, eller
+  et ja til noe annet, teller ikke, og forslag og utførelse skjer aldri i samme tur);
+- jaet er et ja uten forbehold: «men», «vent», «nei», «heller» opphever det;
+- forslaget ikke er utløpt, og ble laget for samme bruker;
+- dataene ikke er endret siden forslaget (sammenlign det forslaget bygde på).
+
+Fjern forslaget fra lageret **før første `await`**, så to like kall i samme svar ikke
+begge skriver.
+
+**Parallelle kall.** `tool_call`-kroken kjører for alle kallene i et svar før noe
+resultat finnes. Tell det politikken har sluppet gjennom i turen i minnet, synkront
+fra sjekk til notering; grenen viser ikke kall uten resultat.
+
+**Nøkkelord er fulle av feller:**
+
+- Bruk ordgrenser som tåler æøå: `(^|[^a-zæøå])(slett|fjern)(?![a-zæøå])`.
+- Ta ikke med bøyninger som også er vanlige oppgavetekster: «fjerne gammel silikon» i
+  en liste, fulgt av «rydd opp», ville ellers gitt fullmakt til å slette. Imperativene
+  er nok.
+- Fjern appens egne innskutte linjer (vedleggslinjer, filnavn) før ordene sjekkes.
+
+**Valider hele batchen før første skriving.** Feiler noe underveis likevel, skal
+feilmeldingen si hva som *ble* lagret.
+
+**Journalen:** resultater med `sammendrag` og uten `isError`, uten personopplysninger.
+Merk agentens API-kall med en header (`x-via: agent`), så serverens egen endringslogg
+skiller agenten fra appen.
+
+**Politikken er uavhengig av modellen.** Test at hvitlisten, vaktene og journalen er de
+samme etter et modellbytte midt i en tråd.
+
+## 9. Vakter for styring av fysiske ting
+
+Lys, varme, en TV: lett å angre, så ikke utløserord eller bekreftelse, men det er
+fysisk og kan styres av fremmed tekst. Alt dette, i kode:
+
+- et styringsverb i en **kort** brukermelding (en lang melding er ofte limt inn);
+- «ja» teller bare rett etter brukerens egen bestilling;
+- ingen styring etter at et lesende verktøy har kjørt i turen (tur-smitte,
+  fremmed-tekst.md);
+- et tak på antall styringskall per tur;
+- en hvitliste av domener og handlinger, med grenser på verdiene (temperatur, lysstyrke);
+- avvis enheter med navn som tyder på lås, port eller ventil, sjekket etter
+  NFKD-normalisering så bokstavvarianter ikke slipper forbi;
+- modellen ser et minimum av felt om hver enhet.
+
 ## Sjekkliste
 
 - [ ] Verktøyene skriver gjennom appens HTTP-API, ikke i lagringen
@@ -329,7 +412,7 @@ og null for lesing og feil.
 - [ ] Endring returnerer forrige verdi; sletting returnerer det slettede objektet
 - [ ] Sletting slår opp oppføringen først
 - [ ] Grenseverdier avvises i kode, med grensen i feilmeldingen
-- [ ] Systemprompten har de seks reglene, og sier at de går foran
+- [ ] Systemprompten har de sju reglene, og sier at de går foran
 - [ ] Tester mot faux-provider + ekte server gjennom samme samtalemodul som drift,
       med assert på disk og på `isError`
 - [ ] Utvalget av verktøy er begrunnet i en kommentar, ikke bare arvet fra API-et

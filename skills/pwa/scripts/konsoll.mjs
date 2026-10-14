@@ -2,10 +2,11 @@
 // som ikke lastet. Kjør mot produksjon etter utrulling (bare lesing).
 //   node konsoll.mjs http://127.0.0.1:3210 '' program utforsk praktisk
 import { spawn } from 'node:child_process'; import fs from 'node:fs'; import os from 'node:os'; import path from 'node:path';
+import { finnChrome } from './chrome.mjs';
 const [basis = 'http://127.0.0.1:3210', ...RUTER] = process.argv.slice(2);
 const DEV = 9850 + Math.floor(Math.random() * 60);
 const profil = fs.mkdtempSync(path.join(os.tmpdir(), 'chrome-k-'));
-const chrome = spawn(process.env.CHROME || '/usr/bin/google-chrome', ['--headless=new', '--disable-gpu', '--disable-extensions', '--no-sandbox', `--remote-debugging-port=${DEV}`, `--user-data-dir=${profil}`, 'about:blank'], { stdio: 'ignore' });
+const chrome = spawn(finnChrome(), ['--headless=new', '--disable-gpu', '--disable-extensions', '--no-sandbox', `--remote-debugging-port=${DEV}`, `--user-data-dir=${profil}`, 'about:blank'], { stdio: 'ignore' });
 let liste; for (let i = 0; i < 50; i++) { try { liste = await (await fetch(`http://127.0.0.1:${DEV}/json/list`)).json(); if (liste.length) break; } catch {} await new Promise((r) => setTimeout(r, 200)); }
 const ws = new WebSocket(liste.find((t) => t.type === 'page').webSocketDebuggerUrl); await new Promise((r) => (ws.onopen = r));
 let id = 0; const v = new Map(); const funn = []; let rute = '';

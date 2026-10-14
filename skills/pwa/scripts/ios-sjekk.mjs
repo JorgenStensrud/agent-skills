@@ -1,11 +1,13 @@
 // Sjekker iOS-runden mot en kjørende server: faner, rulleminne, aktiv fane, sticky
 // dagoverskrift, bunnark, sveip med ekte berøring, Dynamic Type, ikonmerke, kalender.
+// Bruk: node ios-sjekk.mjs <basis-url> [utmappe]. Rutene og velgerne under er appens; tilpass.
 import { spawn } from 'node:child_process'; import fs from 'node:fs'; import os from 'node:os'; import path from 'node:path';
-const BASIS = process.env.UX_BASIS || 'http://127.0.0.1:3403';
-const UT = process.env.UX_UT || '/tmp/ios'; fs.mkdirSync(UT, { recursive: true });
+import { finnChrome } from './chrome.mjs';
+const BASIS = process.argv[2] || process.env.UX_BASIS || 'http://127.0.0.1:3403';
+const UT = process.argv[3] || process.env.UX_UT || path.join(os.tmpdir(), 'ios'); fs.mkdirSync(UT, { recursive: true });
 const DEV = 9600 + Math.floor(Math.random()*60);
 const profil = fs.mkdtempSync(path.join(os.tmpdir(),'chrome-ios-'));
-const chrome = spawn('/usr/bin/google-chrome',['--headless=new','--disable-gpu','--disable-extensions','--no-sandbox',`--remote-debugging-port=${DEV}`,`--user-data-dir=${profil}`,'about:blank'],{stdio:'ignore'});
+const chrome = spawn(finnChrome(),['--headless=new','--disable-gpu','--disable-extensions','--no-sandbox',`--remote-debugging-port=${DEV}`,`--user-data-dir=${profil}`,'about:blank'],{stdio:'ignore'});
 let liste; for(let i=0;i<50;i++){try{liste=await (await fetch(`http://127.0.0.1:${DEV}/json/list`)).json();if(liste.length)break;}catch{}await new Promise(r=>setTimeout(r,200));}
 const ws=new WebSocket(liste.find(t=>t.type==='page').webSocketDebuggerUrl); await new Promise(r=>(ws.onopen=r));
 let id=0; const v=new Map(); const feil=[]; ws.onmessage=(e)=>{const m=JSON.parse(e.data); if(m.method==='Runtime.exceptionThrown') feil.push((m.params.exceptionDetails.exception?.description||m.params.exceptionDetails.text).slice(0,160)); if(m.id&&v.has(m.id)){v.get(m.id)(m);v.delete(m.id);}};

@@ -43,7 +43,7 @@ case "$SRC" in
     [ -f "$SRC" ] || { echo "render: no such file: $SRC" >&2; exit 3; }
     command -v uvx >/dev/null \
       || { echo "render: markdown input needs uv (brew install uv), or pass HTML" >&2; exit 4; }
-    uvx --quiet --from markdown markdown_py \
+    uvx --quiet --from markdown==3.11 markdown_py \
         -x extra -x sane_lists -x smarty "$SRC" > "$TMP/body.html" 2>"$TMP/md.log" \
       || { echo "render: markdown conversion failed — $(tail -1 "$TMP/md.log")" >&2; exit 4; }
     TITLE="$(basename "${SRC%.*}")"
@@ -80,8 +80,10 @@ CHROME="$(find_chrome)" || {
   echo "render: no Chrome/Chromium found. Install Google Chrome, or run: npx playwright install chromium" >&2
   exit 4
 }
-"$CHROME" --headless --disable-gpu --no-sandbox --no-pdf-header-footer \
-          --virtual-time-budget=10000 \
+# A fresh profile and HOME per run: a service user may have no writable home, and
+# two renders sharing the default profile crash each other.
+HOME="$TMP" "$CHROME" --headless --disable-gpu --no-sandbox --no-pdf-header-footer \
+          --user-data-dir="$TMP/chrome" --virtual-time-budget=10000 \
           --print-to-pdf="$OUT" "file://$TMP/styled.html" >"$TMP/chrome.log" 2>&1 \
   || { echo "render: chrome failed — $(tail -1 "$TMP/chrome.log")" >&2; exit 4; }
 
