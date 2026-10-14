@@ -144,10 +144,12 @@ fi
 while IFS=$'\t' read -r n rm; do
   png="$OUT/page-$(printf %03d "$n").png"
   [ -n "$rm" ] || { echo "page $n: (blank)"; continue; }
-  uvx -q --from rmc rmc -t svg "$rm" -o "$WORK/p.svg" 2>/dev/null \
+  # rmc follows the tablet's file format, so pin it; a new firmware may need a newer one.
+  uvx -q --from rmc==0.3.0 rmc -t svg "$rm" -o "$WORK/p.svg" 2>/dev/null \
     || { echo "read: could not decode page $n" >&2; exit 4; }
   rsvg-convert -z 3 -b white "$WORK/p.svg" -o "$png" \
     || { echo "read: could not render page $n" >&2; exit 4; }
-  magick "$png" -trim +repage -bordercolor white -border 30 "$png" 2>/dev/null || true
+  # 1568 px on the long side is what a vision model reads; more only costs tokens.
+  magick "$png" -trim +repage -bordercolor white -border 30 -resize '1568x1568>' "$png" 2>/dev/null || true
   echo "page $n: $png"
 done <"$WORK/pages"
