@@ -97,17 +97,17 @@ på flisene, ikke statuskoden. Verifisert med nettet fysisk kuttet.
 - Én bakgrunnsoppfrisking om gangen — hver `vis()` (hashchange, forgrunn) ville ellers
   stable 68 KB-hentinger på dårlig nett. **Men ikke bare `oppfrisking ??= …`:** en
   skriving rett etter at en henting har startet, får da svaret fra *før* skrivingen.
-  Hold et flagg for «hent én gang til etterpå»:
+  Kommer et kall mens en henting pågår, hent én gang til etterpå, og gi kalleren
+  *den* hentingen. Da får kalleren det ferske svaret, og en feil når fram til den som
+  venter, i stedet for å bli en uhåndtert rejection i en henting ingen eier:
 
   ```js
-  let paagaar = null, igjen = false;
+  let paagaar = null, neste = null;
   export function hent() {
-    if (paagaar) { igjen = true; return paagaar; }
-    paagaar = hentFersk().finally(() => {
-      paagaar = null;
-      if (igjen) { igjen = false; hent(); }
-    });
-    return paagaar;
+    if (!paagaar) return (paagaar = hentFersk().finally(() => { paagaar = null; }));
+    // Alle som kommer mens en henting pågår, deler én ny henting etterpå.
+    neste ??= paagaar.catch(() => {}).then(() => { neste = null; return hent(); });
+    return neste;
   }
   ```
 - Memoisert henting på modulnivå («én gang per sidevisning») trenger en eksplisitt
