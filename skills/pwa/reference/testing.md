@@ -5,11 +5,15 @@ versjonsavgjørelse, varselutløsere, markdown-tolking, layoutregning) **er** en
 funksjon uten DOM, testet i `node --test`. Det som trenger en nettleser kjøres i
 headless Chrome over CDP. Screenshots leses som bilder før man sier «ferdig».
 
-## Headless Chrome over CDP (Playwright og chrome-devtools-mcp feilet i miljøet)
+## Headless Chrome over CDP
 
-`/usr/bin/google-chrome --headless=new --disable-gpu --disable-extensions --no-sandbox
+Rå CDP fra Node, uten Playwright. (I ett miljø feilet både Playwright og
+chrome-devtools-mcp; andre steder virker de. Skriptene her trenger bare Chrome.)
+
+`$CHROME --headless=new --disable-gpu --disable-extensions --no-sandbox
 --remote-debugging-port=<port> --user-data-dir=<fersk> about:blank`, `WebSocket` finnes
-i Node, `Runtime.evaluate` med `returnByValue: true, awaitPromise: true`.
+i Node, `Runtime.evaluate` med `returnByValue: true, awaitPromise: true`. Skriptene
+finner Chrome selv (`CHROME` overstyrer; på macOS også Chrome for Testing).
 
 Fem feller, alle påkrevd for at bildet skal vise det du tror:
 
@@ -57,12 +61,16 @@ ubrukelige til å vise noe — en PNG servert fra appen virket.
 
 | Skript | Gjør |
 | --- | --- |
-| `skjerm.mjs <url> <png> [js]` | ett skjermbilde i 390 px, valgfri JS først (resultatet skrives ut) |
+| `skjerm.mjs <url> <png> [js] [--init js] [--mork]` | ett skjermbilde i 390 px, valgfri JS først (resultatet skrives ut); `--init` kjøres før sidas egen kode (sett `localStorage` før første tegning), `--mork` gir mørk modus |
 | `skjerm-fake-strom.mjs <url> <png> <hendelser-json> [js]` | samme, med falsk `EventSource` som spiller av hendelser — chat i valgt tilstand uten agent |
 | `frisk-sw.mjs <basis> <cachenavn> [ruter]` | fersk installasjon **med** SW: aktiv?, cachenavn, antall filer i skallet, konsollfeil på late ruter |
 | `konsoll.mjs <basis> [ruter]` | sveip over ruter med SW på: konsollfeil, HTTP ≥ 400, bilder som ikke lastet |
-| `ios-sjekk.mjs` | iOS-runden mot en kjørende server: faner, rulleminne, sticky, bunnark, sveip med ekte berøring, Dynamic Type, ikonmerke, kalender (tilpass rutene) |
-| `nyversjon-e2e.mjs` | ende til ende: app oppe, «ny utrulling», sida bytter selv ved forgrunn, «Hent den» under bruk (tilpass stiene) |
+| `ios-sjekk.mjs <basis>` | iOS-runden mot en kjørende server: faner, rulleminne, sticky, bunnark, sveip med ekte berøring, Dynamic Type, ikonmerke, kalender (tilpass rutene) |
+| `nyversjon-e2e.mjs <appmappe> <port>` | ende til ende: app oppe, «ny utrulling», sida bytter selv ved forgrunn, «Hent den» under bruk (tilpass miljøvariablene i toppen) |
+| `skall-til-sw.mjs <dist> <sw.js>` | ikke en test, men bygget: hasher byggefilene til et cachenavn og skriver `CACHE` og `SKALL` inn i `sw.js`; feiler hvis plassholderne mangler (oppdatering.md avsnitt 6) |
+
+Sjekk at PNG-fila faktisk finnes og ikke er tom før du leser den. Ett verktøy meldte
+«lagret» uten å ha skrevet noen fil.
 
 Måleskriptet i reiseapp (`verktoy/ux-skjermer.mjs`) gir i tillegg `maal.json` per rute:
 sidehøyde, trykkflater under 44 px, skriftstørrelser, overskrifter. **Mål før og etter**
@@ -85,6 +93,15 @@ hver runde og skriv tallene i planen (Utforsk 36 509 → 2 245 px, 149 → 0 sm�
   en tekstfil med `.jpg`-navn skal gi `null`, ikke kaste.
 - Oppstartsmigreringer: skriv en «gammel» `reise.json` til en temp-mappe, spawn en server
   til på `PORT + n`, poll API-et — så dekkes både minnet og disken.
+- **Service workeren i node:** `sw.js` er et vanlig skript. Kjør det i
+  `vm.runInNewContext(kode, { self: { addEventListener() {} }, location: { origin: 'http://x' }, Headers, Response })`,
+  så ligger de rene hjelperne (`fraLager`, hvilke cacher som beholdes, hvilke stier som
+  er bilder) i konteksten og kan testes uten nettleser.
+- **Falsk push:** når et miljøflagg peker på en fil, skriver serveren hver push som en
+  JSON-linje der i stedet for å sende. Et endepunkt som slutter på `/dod-410` svarer
+  som et dødt abonnement, så oppryddingen testes også.
+- **Chatten uten innlogging:** en demo-modell som svarer med ferdige svar gir ekte
+  skjermbilder av chatten, med strømming og verktøylinjer, uten konto og uten kvote.
 
 Agentloopen testes mot Pi sin faux-provider (ingen nettverk), gjennom samme
 samtale-modul som drift bruker; API-et med en spawnet server mot tom datamappe.
@@ -111,6 +128,9 @@ tid.
   en test som blir rød etter turen er en test ingen tror på.
 - Flere headless Chrome samtidig trenger hver sin tilfeldige port, og targeten velges
   først etter opptil 100 × 150 ms venting.
+- `node --test` kjører testfilene **parallelt**. Filer som starter servere på faste
+  porter, krasjer av og til i hverandre. Gi hver fil sitt eget portområde, eller kjør
+  med `--test-concurrency=1`.
 - Testen regnet «i morgen» i UTC, verktøyet i Roma-tid: ulik dag rundt midnatt.
 - Miljøhygiene: 28 lekkede headless Chrome-prosesser (`pkill -f "user-data-dir=/tmp/chrome-"`),
   gamle dev-servere som serverte gammel kode (drep etter PID fra `ss -ltnp`, ikke

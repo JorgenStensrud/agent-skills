@@ -3,11 +3,12 @@
 // agent eller innlogging. Hendelsene er en JSON-liste; hver blir én onmessage.
 //   node skjerm-fake-strom.mjs 'http://127.0.0.1:3403/#/spor' /tmp/tom.png '[{"type":"tilstand","meldinger":[],"ko":[]}]' "document.querySelectorAll('.boble').length"
 import { spawn } from 'node:child_process'; import fs from 'node:fs'; import os from 'node:os'; import path from 'node:path';
+import { finnChrome } from './chrome.mjs';
 const [url, ut, hendelserJson, js] = process.argv.slice(2);
 if (!url || !ut || !hendelserJson) { console.error('bruk: node skjerm-fake-strom.mjs <url> <ut.png> <hendelser-json> [js]'); process.exit(1); }
 const DEV = 9500 + Math.floor(Math.random() * 60);
 const profil = fs.mkdtempSync(path.join(os.tmpdir(), 'chrome-sf-'));
-const chrome = spawn(process.env.CHROME || '/usr/bin/google-chrome', ['--headless=new', '--disable-gpu', '--disable-extensions', '--no-sandbox', `--remote-debugging-port=${DEV}`, `--user-data-dir=${profil}`, 'about:blank'], { stdio: 'ignore' });
+const chrome = spawn(finnChrome(), ['--headless=new', '--disable-gpu', '--disable-extensions', '--no-sandbox', `--remote-debugging-port=${DEV}`, `--user-data-dir=${profil}`, 'about:blank'], { stdio: 'ignore' });
 let liste; for (let i = 0; i < 50; i++) { try { liste = await (await fetch(`http://127.0.0.1:${DEV}/json/list`)).json(); if (liste.length) break; } catch {} await new Promise((r) => setTimeout(r, 200)); }
 const ws = new WebSocket(liste.find((t) => t.type === 'page').webSocketDebuggerUrl); await new Promise((r) => (ws.onopen = r));
 let id = 0; const v = new Map(); ws.onmessage = (e) => { const m = JSON.parse(e.data); if (m.id && v.has(m.id)) { v.get(m.id)(m); v.delete(m.id); } };

@@ -155,10 +155,35 @@ rullende boksen (chatlista) eller `window`.
 tilbakestilling ved lukking), lukkes ved `hashchange` så låsen ikke henger igjen etter
 en kantsveip.
 
+**Arket og snackbaren må også følge tastaturet**, ikke bare chatpanelet. Har arket et
+felt, legges det bak tastaturet: når tastaturet er oppe (en klasse på `html`), får
+bakgrunnen `top: var(--vv-top)` og `height: var(--vv-hoyde)`, og arket
+`max-height: calc(var(--vv-hoyde) - 12px)`. Snackbaren flyttes fra bunnen til toppen
+(`top: calc(var(--vv-top) + env(safe-area-inset-top) + 10px)`), ellers ligger den
+under tastaturet.
+
+## Innhold som legges til over det man ser på
+
+Safari har ikke `overflow-anchor`. Legges det til rader *over* (en «Vis tidligere»-
+knapp i en kalender), hopper innholdet nedover. Mål `scrollHeight` før endringen og
+rull differansen etterpå, før tegning:
+
+```js
+const tidligere = () => { forHoyde.current = document.documentElement.scrollHeight; settForan((f) => f + 8); };
+useLayoutEffect(() => {
+  if (forHoyde.current === null) return;
+  window.scrollBy(0, document.documentElement.scrollHeight - forHoyde.current);
+  forHoyde.current = null;
+}, [foran]);
+```
+
 ## Lyskasse (bilder i fullskjerm)
 
 Samme kroppslås som arket — uten den ruller lista bak når fingeren drar på bildet, og
 man kommer tilbake til et annet sted i albumet. Trykk hvor som helst lukker, unntatt på
 `a, button, input, textarea` under bildet (bildetekst-felt, «spør agenten»-felt).
+«Hold for å se» (en annen versjon mens fingeren ligger på bildet) trenger
+`-webkit-touch-callout: none` og `user-select: none` på bildet, ellers åpner iOS
+sin egen meny eller markerer tekst i stedet.
 Fjern `hashchange`-lytteren i `lukk()` også — en `{ once: true }`-lytter som aldri fyrte
 henger igjen etter vanlig lukking og kan fjerne kroppslåsen til en *senere* lyskasse.
