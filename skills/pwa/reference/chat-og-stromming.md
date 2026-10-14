@@ -114,15 +114,18 @@ aldri gjennom `innerHTML`. To måter å strømme på:
 
 - Stjerner og understreker midt i ord (`snake_case`, `2*3*4`) er ikke formatering:
   lookbehind/lookahead på ordtegn i regexen.
-- Bilder `![alt](url)` bare fra eget opphav (`/…`) eller `https://` — aldri
-  `javascript:` eller `data:`. Vises som småbilde (`/mini/…`) i en `<button>` som åpner
-  lyskassa med originalen. Et avsnitt som bare er bilder blir en rad.
+- Bilder `![alt](url)` bare fra eget opphav med en fast sti (`/mini/<id>`) — aldri
+  `https://` utenfra, `javascript:` eller `data:`. Et bilde lastes uten at noen trykker,
+  så en ekstern bilde-URL i modelltekst kan sende data ut i det øyeblikket svaret
+  tegnes. Vises som småbilde i en `<button>` som åpner lyskassa med originalen. Et
+  avsnitt som bare er bilder blir en rad.
 - Lenker `target="_blank" rel="noopener"`; bare `http(s)`.
 - **Lenkevern for modelltekst.** En modell som har lest en nettside eller en e-post,
-  kan være styrt av den, og en lenke som `https://angriper.no/?d=<data>` lekker på ett
-  trykk. Vis alltid det ekte vertsnavnet, og gjør lenker med query, hash, port,
-  brukerinfo eller lang sti om til ren tekst. Detaljene: skillen `agent-i-appen`,
-  reference/fremmed-tekst.md.
+  kan være styrt av den, og en lenke lekker på ett trykk — også med en kort sti eller
+  et underdomene (`https://saldo-12345.angriper.no/`), så formen på URL-en avgjør
+  ingenting. Klikkbar bare når den eksakte URL-en står i brukerens egne meldinger;
+  ellers hele adressen som tekst med det ekte vertsnavnet, og åpning etter et ja.
+  Detaljene: skillen `agent-i-appen`, reference/fremmed-tekst.md («Hver vei ut»).
 
 ## Skråstrek-kommandoer
 

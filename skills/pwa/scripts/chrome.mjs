@@ -15,7 +15,10 @@ const INNI = ['Google Chrome for Testing.app/Contents/MacOS/Google Chrome for Te
 const mapper = (m) => { try { return fs.readdirSync(m).map((n) => path.join(m, n)); } catch { return []; } };
 
 export function finnChrome() {
-  if (process.env.CHROME) return process.env.CHROME;
+  if (process.env.CHROME) {
+    if (!fs.existsSync(process.env.CHROME)) throw new Error(`CHROME=${process.env.CHROME} finnes ikke`);
+    return process.env.CHROME;
+  }
   const fast = FASTE.find((f) => fs.existsSync(f));
   if (fast) return fast;
   // <cache>/<versjon>/<plattform>/<program>, f.eks. chromium-1234/chrome-mac-arm64/Google Chrome for Testing.app/…
