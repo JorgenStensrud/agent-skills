@@ -10,6 +10,9 @@ selv kan endre, og en skrivepolitikk i kode. Referanse: `reiseapp/agent/`.
   en rå `Agent`: da eier Pi tråden, køen (`followUp()`), «ett svar om gangen», lagringen
   (JSONL per samtale under `<data>/samtaler/`) og komprimeringen. Nettleseren er en tynn
   tegner (se `pwa`-skillen, reference/chat-og-stromming.md).
+- `SettingsManager.inMemory({ followUpMode: 'one-at-a-time', steeringMode: 'one-at-a-time' })`:
+  hvert spørsmål som ble lagt i kø mens et svar strømmet, får sin egen tur og sitt eget
+  svar, i stedet for at Pi slår dem sammen til ett.
 - `DefaultResourceLoader` med `noExtensions/noSkills/noPromptTemplates/noThemes/noContextFiles`
   og `additionalExtensionPaths` til `node_modules/<pakke>`: ingenting fra `~/.pi` — alt
   agenten kan, står i repoet. Sjekk `loader.getExtensions().errors` og kast.
@@ -57,11 +60,9 @@ selv kan endre, og en skrivepolitikk i kode. Referanse: `reiseapp/agent/`.
 
 - Verktøyene speiler det brukerne selv kan endre i appen, ikke mer; hvert skrivende
   verktøy svarer med en ferdig setning agenten skal gjengi («Skrev dagboka for …»).
-- **Skrivepolitikk som Pi-utvidelse på `tool_call`**, ikke bare i prompten: hvitliste av
-  navn; sletteverktøy krever et sletteord (`slett|fjern|ta bort|stryk|dropp`) i en av de
-  *to* siste brukermeldingene; dyre verktøy (`krever`) krever et utløserord; `tool_result`
-  journalføres som JSON-linjer i `<data>/agent-endringer.jsonl`, og en `/endringer`-kommando
-  viser de siste. Se skriveverktoy.md punkt 7.
+- Skrivepolitikken (hvitliste, sletteord, utløserord, journal) står i skriveverktoy.md
+  punkt 7 og 8. Journalen som JSON-linjer i `<data>/agent-endringer.jsonl`, og en
+  `/endringer`-kommando viser de siste.
 - Delvis PUT for data flere skriver til: bare felt som *finnes* i kroppen erstattes, og
   verktøybeskrivelsen sier det samme («Bare feltene du sender endres»).
 - Skråstrek-kommandoer eies av serveren og utvides til hele setninger; systemkommandoer
