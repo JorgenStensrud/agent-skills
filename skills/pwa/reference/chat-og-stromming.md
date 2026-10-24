@@ -68,12 +68,22 @@ høyere enn 90 % av lista.
 dro lista til bunns. Tre runder: (1) hopp til bunns per bit slåss med tastaturet, (2)
 `scrollIntoView` uten animasjon var bedre men rykket fortsatt, (3) `naerBunn` holdt.
 
+- **Tråden starter nederst, uten å synes.** Rull til bunns *før første tegning*: i React
+  i `useLayoutEffect`, ikke `useEffect`, ellers ser man toppen av tråden et øyeblikk
+  før den hopper.
+- **Når feltet får fokus**, rull til bunns *etter* at tastaturet står (en kort
+  `setTimeout`, ~250 ms), ellers havner siste melding bak tastaturet.
+
 ## Chatten er et fast panel
 
 Se navigasjon.md: panelet er `fixed`, bare `.samtale` ruller, `overscroll-behavior:
 contain`. Med `html { overscroll-behavior: none }` tok ikke pull-to-refresh fingeren
-lenger. Skrivefeltet: `<textarea rows=1>` med `enterkeyhint="send"`,
-`autocapitalize="sentences"`; Enter sender (Shift+Enter linjeskift).
+lenger. Skrivefeltet: `<textarea rows=1>` med `autocapitalize="sentences"`.
+
+**Enter avhenger av tastaturet.** Med mus og fysisk tastatur sender Enter (Shift+Enter
+gir linjeskift). På berøringsskjerm (`matchMedia('(pointer: coarse)')`) gir Enter
+linjeskift, og bare knappen sender, som i ChatGPT: på telefonen er Enter den eneste
+måten å lage et avsnitt på. Sett da ikke `enterkeyhint="send"`.
 
 ## Myke overganger
 
@@ -92,15 +102,30 @@ lenger. Skrivefeltet: `<textarea rows=1>` med `enterkeyhint="send"`,
 
 `markdown.js`: en liten tolker (avsnitt, lister, overskrifter, fet, kursiv, kode,
 lenker, bilder) til et tre; `format.js` bygger DOM med `el()`. Modellens tekst går
-aldri gjennom `innerHTML`. Mens det strømmer er det ren tekst (`white-space: pre-wrap`)
-— et halvt `**` skal ikke blinke som fet; formateringen skjer ved `melding_slutt`.
+aldri gjennom `innerHTML`. To måter å strømme på:
+
+- **Ren tekst til svaret er ferdig** (`white-space: pre-wrap`), og formatering ved
+  `melding_slutt`. Enkelt, men svaret hopper når det formateres.
+- **Formatér mens det strømmer**, med det uferdige lukket før tolkningen: et halvt
+  `**` eller en halv `` ` `` lukkes, en åpen kodeblokk får et avsluttende gjerde, og en
+  påbegynt tabellrad (uten avsluttende `|`) holdes tilbake til den er hel. Tegn høyst
+  én gang per `requestAnimationFrame`. Da står formateringen riktig fra første tegn,
+  og ingenting hopper når svaret er ferdig. Lukkingen er en ren funksjon, testet i node.
 
 - Stjerner og understreker midt i ord (`snake_case`, `2*3*4`) er ikke formatering:
   lookbehind/lookahead på ordtegn i regexen.
-- Bilder `![alt](url)` bare fra eget opphav (`/…`) eller `https://` — aldri
-  `javascript:` eller `data:`. Vises som småbilde (`/mini/…`) i en `<button>` som åpner
-  lyskassa med originalen. Et avsnitt som bare er bilder blir en rad.
+- Bilder `![alt](url)` bare fra eget opphav med en fast sti (`/mini/<id>`) — aldri
+  `https://` utenfra, `javascript:` eller `data:`. Et bilde lastes uten at noen trykker,
+  så en ekstern bilde-URL i modelltekst kan sende data ut i det øyeblikket svaret
+  tegnes. Vises som småbilde i en `<button>` som åpner lyskassa med originalen. Et
+  avsnitt som bare er bilder blir en rad.
 - Lenker `target="_blank" rel="noopener"`; bare `http(s)`.
+- **Lenkevern for modelltekst.** En modell som har lest en nettside eller en e-post,
+  kan være styrt av den, og en lenke lekker på ett trykk — også med en kort sti eller
+  et underdomene (`https://saldo-12345.angriper.no/`), så formen på URL-en avgjør
+  ingenting. Klikkbar bare når den eksakte URL-en står i brukerens egne meldinger;
+  ellers hele adressen som tekst med det ekte vertsnavnet, og åpning etter et ja.
+  Detaljene: skillen `agent-i-appen`, reference/fremmed-tekst.md («Hver vei ut»).
 
 ## Skråstrek-kommandoer
 
@@ -123,6 +148,10 @@ og test grensa med en kropp som faktisk er stor (600 kB), små testbilder så de
 `createImageBitmap` der det finnes (retter EXIF-rotasjon), ellers `<img>`-veien
 (Safari). Høyst fire per melding, egen JSON-grense på ruta (24 MB), server validerer
 mimetype og base64.
+
+**Filer fra iPhone har ofte tom `File.type`**, særlig `.md` og `.csv`. La endelsen
+avgjøre når typen mangler, både for bilder og for tekstfiler, ellers avvises en
+gyldig fil som «ukjent type».
 
 ## Andre sider sender ferdige spørsmål
 

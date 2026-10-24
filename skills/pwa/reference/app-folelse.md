@@ -44,6 +44,10 @@ Alle `font-size` i **rem**, så hele appen skalerer med rota. Da kan innstilling
 «tekststørrelse» i appen fjernes — telefonen eier den. Skrift under 13 px er
 uleselig i sol; metadata på 15 px, brødtekst 17 px.
 
+*Antatt, ikke målt:* når brukeren har valgt mindre tekst på telefonen, gir
+`-apple-system-body` en rot under 16 px, og felt med `font: inherit` arver den og
+zoomer ved fokus (regel 7 over). Gi feltene et gulv: `font-size: max(16px, 1rem)`.
+
 ## Trykkflater og sol
 
 - **44 × 44 px** på alt som kan trykkes (Apple sitt minstemål). Ta hele raden som
@@ -63,6 +67,10 @@ uleselig i sol; metadata på 15 px, brødtekst 17 px.
   lyse i mørk modus. Én `--glass`-variabel som følger temaet, og skill flatefarge
   (`--vann`) fra tekstfarge (`--vann-tekst`): aksenten trenger hver sin lys/mørk-variant.
 - Mørk/lys-bryteren og tannhjulet oppe til høyre på Hjem, der folk leter.
+- **Med manuell overstyring av tema må `color-scheme` følge valget**, ikke bare
+  telefonen: `:root[data-theme="dark"] { color-scheme: dark }` og tilsvarende for lys.
+  Ellers får tastaturet, datovelgerne og rullefeltene telefonens tema mens sida har
+  det motsatte.
 - Lytt på `matchMedia('(prefers-color-scheme: dark)')` sin `change`: telefonen bytter
   til mørk ved solnedgang mens appen står åpen, og uten lytteren sto lys aksentpalett på
   svart bakgrunn til noen lastet på nytt. Når brukeren overstyrer temaet, følger ikke
@@ -104,6 +112,14 @@ uleselig i sol; metadata på 15 px, brødtekst 17 px.
 - Nettstripe «Uten nett — viser det vi hentet sist» på `offline`-hendelsen, og
   skrivinger som feiler på nett legges i en kø i minnet (ikke localStorage: en fane
   som var lukket i går skal ikke sende gamle endringer inn i delte data i dag).
+
+## WebGL (3D) på iPhone
+
+Safari har et tak på antall levende WebGL-kontekster, og en kontekst som bare slippes,
+frigjøres ikke med en gang. Åpner man en 3D-visning noen ganger, blir lerretet svart.
+Ved opprydding: `renderer.forceContextLoss()` (three.js; ellers
+`gl.getExtension('WEBGL_lose_context').loseContext()`) og `dispose()`, og lag et nytt
+`<canvas>` per scene i stedet for å gjenbruke det gamle.
 
 ## Det maskinen ikke kan bevise (si «antatt», ikke «målt»)
 

@@ -17,6 +17,11 @@ oppdatering.md; dette er fetch-strategiene.
 Alt annet (andre opphav) rører SW-en ikke (`if (url.origin !== location.origin) return`).
 Bare `GET`.
 
+**En SPA svarer alle navigeringer med skallet.** Hver adresse i appen er samme side, så
+oppslaget i cachen gjøres på `/`, ikke på adressen:
+`caches.match(req.mode === 'navigate' ? '/' : req)`. Ellers virker `#/`-ruter offline,
+men en dyp lenke til `/liste/3` gjør det ikke.
+
 ## Det som MÅ gå utenom (`return` uten `respondWith`)
 
 - **Hendelsesstrømmer (SSE)**: `if (url.pathname.includes('/samtaler/')) return;`
@@ -43,6 +48,23 @@ fetch(req).then((s) => { leggICache(req, s.clone()); return s; })
 ```
 
 Appen kan da behandle 503 som «uten nett» i stedet for å krasje på `null`.
+
+**Merk svaret som kom fra lageret.** Uten nett og med en kopi gir nett-først et svar
+som ser ferskt ut. Sett en header på kopien, så sida kan si «tallene er fra i går»:
+
+```js
+function fraLager(svar) {
+  const headers = new Headers(svar.headers);
+  headers.set('x-fra-lager', '1');
+  return new Response(svar.body, { status: svar.status, statusText: svar.statusText, headers });
+}
+// .catch(() => caches.match(req).then((c) => (c ? fraLager(c) : UTEN_NETT())))
+```
+
+**API-et får `no-store` som standard.** Service workeren eier strategien for `/api/`;
+en HTTP-cache som også har en mening, gir en gammel oversikt som er verre enn ingen.
+En mellomvare som setter `Cache-Control: no-store` på alle `/api/*`-svar som ikke har
+satt noe selv.
 
 ## Flisecachen
 
@@ -72,8 +94,22 @@ på flisene, ikke statuskoden. Verifisert med nettet fysisk kuttet.
 - `sistHentet` vises på Hjem, så «hvorfor står det ikke her ennå» har et svar.
 - Nettstripa som lyttet på `DOMContentLoaded` kom aldri — hendelsen hadde alt vært.
   Kall den umiddelbart ved lasting og på `offline`/`online`.
-- Én bakgrunnsoppfrisking om gangen: `oppfrisking ??= hentFersk().finally(() => { oppfrisking = null })`;
-  hver `vis()` (hashchange, forgrunn) ville ellers stable 68 KB-hentinger på dårlig nett.
+- Én bakgrunnsoppfrisking om gangen — hver `vis()` (hashchange, forgrunn) ville ellers
+  stable 68 KB-hentinger på dårlig nett. **Men ikke bare `oppfrisking ??= …`:** en
+  skriving rett etter at en henting har startet, får da svaret fra *før* skrivingen.
+  Kommer et kall mens en henting pågår, hent én gang til etterpå, og gi kalleren
+  *den* hentingen. Da får kalleren det ferske svaret, og en feil når fram til den som
+  venter, i stedet for å bli en uhåndtert rejection i en henting ingen eier:
+
+  ```js
+  let paagaar = null, neste = null;
+  export function hent() {
+    if (!paagaar) return (paagaar = hentFersk().finally(() => { paagaar = null; }));
+    // Alle som kommer mens en henting pågår, deler én ny henting etterpå.
+    neste ??= paagaar.catch(() => {}).then(() => { neste = null; return hent(); });
+    return neste;
+  }
+  ```
 - Memoisert henting på modulnivå («én gang per sidevisning») trenger en eksplisitt
   `glem()` etter en skriving, og en feilet henting må nullstille seg selv.
 - Nettfeil vs. serverfeil: `fetch` uten svar kaster `TypeError` → kø og prøv igjen ved

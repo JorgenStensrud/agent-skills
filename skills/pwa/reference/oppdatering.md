@@ -153,12 +153,35 @@ export function avgjor({ skall, server, swVedLast, swNaa }) {
   (`/vendor/<navn>` fra `node_modules`), `index.html` (`<link>`), og `SKALL` + ny `CACHE`
   i `sw.js`. Glemmes SKALL, virker skrifta på nett og faller til systemskrift uten.
 
-## 6. Verifiser
+## 6. Med byggesteg (Vite eller lignende)
+
+Det samme mønsteret, men bygget gjør det som ellers glemmes:
+
+- **Cachenavnet er en hash av byggefilene.** En byggeplugin (Vite: `closeBundle`) lister
+  alle filene i `dist/`, hasher navn og innhold, og skriver `CACHE` og `SKALL` inn i
+  `sw.js` over plassholdere (`const CACHE = 'app-dev'`, `const SKALL = [/* SKALL */]`).
+  Mangler plassholderne, **feiler bygget**, i stedet for å levere en service worker som
+  aldri bytter. Endres én fil, får service workeren nytt navn og henter hele skallet.
+  `scripts/skall-til-sw.mjs <dist> <sw.js>` gjør det samme uten Vite.
+- **Versjonen** kommer fra `versjon.txt` (export-subst) og inn i koden via `define`
+  (`__VERSJON__`); står malen urørt (`$Format`), er det en utviklingsversjon (`null`).
+- **Cache-headere:** hashede filer under `/assets/` får `public, max-age=31536000,
+  immutable`. Alt annet — `index.html`, SPA-fallbacken, `sw.js`, manifestet — får
+  `no-store`. `max-age=0` er ikke nok her heller (avsnitt 4).
+- **Tunge, sjeldne late moduler holdes utenfor `SKALL`** (en 3D-visning med three.js):
+  ellers lastes de ned på nytt ved hver utrulling av alle, også dem som aldri åpner
+  dem. Bygget hopper over dem når `SKALL` skrives, og service workeren legger dem i en
+  egen cache første gang de brukes, der bare den nyeste versjonen beholdes. Siden
+  navnet er hashet, kan en gammel side be om en fil som er borte fra serveren: reload
+  ved modulfeil (avsnitt 2) trengs fortsatt.
+
+## 7. Verifiser
 
 - `scripts/frisk-sw.mjs <basis> <cachenavn> '#/rute' …`: fersk installasjon med SW
   på, antall filer i cachen, ingen konsollfeil på de late rutene.
-- `scripts/nyversjon-e2e.mjs`: appen står oppe, en «ny utrulling» skrives (versjon i
-  `versjon.txt` + `index.html`, nytt cachenavn), serveren restartes, og sida skal bytte
-  av seg selv ved forgrunn og vise «Hent den» under bruk. Tilpass stiene i toppen.
+- `scripts/nyversjon-e2e.mjs <appmappe> <datamappe> [port]`: appen står oppe, en «ny
+  utrulling» skrives (versjon i `versjon.txt` + `index.html`, nytt cachenavn), serveren
+  restartes, og sida skal bytte av seg selv ved forgrunn og vise «Hent den» under bruk.
+  Tilpass `MILJO` og velgerne i toppen av skriptet til appen.
 - `test/oppdatering.test.js`-mønsteret: `avgjor()` og `skallVersjonFra()` som rene
   funksjoner med alle fire kombinasjonene.

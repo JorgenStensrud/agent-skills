@@ -100,8 +100,13 @@ appen: tailnettet er grensen; hold den utenfor en offentlig reverse proxy.
   `*.local`, `*.internal`; bare `https:` som skjema (Python `urlopen` godtar `file://`);
   `redirect: 'manual'` i en løkke på høyst 4 hopp; størrelse sjekket både på
   `content-length` og etter `arrayBuffer()`; én miljøvariabel skrur hele vakten av i test.
-  Feller som står igjen: DNS-rebinding mellom sjekk og `fetch`, og at hele kroppen leses i
-  minnet før den andre målingen. Filnavn fra høstede felt går gjennom en slug, aldri feltet.
+  Filnavn fra høstede felt går gjennom en slug, aldri feltet.
+- **DNS-rebinding** (navnet svarer offentlig ved sjekken og privat ved tilkoblingen)
+  stenges bare ved å sjekke adressen det faktisk kobles til: hent over `node:http(s)`
+  med et eget `lookup` og `agent: false`, ikke `fetch`. IPv6 i alle former må med
+  (IPv4-mappet, NAT64, 6to4, Teredo). **Les kroppen som strøm med tak**, og pakk ut
+  gzip selv med samme tak, ellers er en liten gzip-bombe nok. Hele sperren: skillen
+  `agent-i-appen`, reference/fremmed-tekst.md («SSRF-sperren»).
 - **LLM-JSON må ikke spres sist** over betrodde felt (`{ kode, url, ...json }`): modellens
   svar kan overskrive `url` med `javascript:`; plukk felt eksplisitt, og la `el()`/en
   `trygtHref` avvise alt annet enn `https?:`, `#/`, `tel:`, `mailto:` — seed-data går utenom

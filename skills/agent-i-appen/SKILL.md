@@ -18,7 +18,7 @@ Mønstrene gjelder ethvert verktøybrukende LLM-oppsett; kodeeksemplene er Pi.
 
 | Oppgave | Les |
 | --- | --- |
-| Agenten skal kunne endre data: verktøyenes form, svaret som manus, systemprompten, politikken som utvidelse, testing med faux-modellen | [reference/skriveverktoy.md](reference/skriveverktoy.md) |
+| Agenten skal kunne endre data: verktøyenes form, svaret som manus, systemprompten, politikken som utvidelse, testing med faux-modellen, ferdigheter og politikk i fire nivåer, forslag og ja, styring av fysiske ting | [reference/skriveverktoy.md](reference/skriveverktoy.md) |
 | Sesjonen på serveren, lagring, innlogging, kontekst-trimming, fersk tilstand før hver tur, modellvalg, PDF-lesing, kommandoer | [reference/sesjon-og-kontekst.md](reference/sesjon-og-kontekst.md) |
 | Agenten leser tekst utenfra (nettsider, søk, e-post, banktekster, kalenderinvitasjoner) og kan også sende noe ut eller styre noe | [reference/fremmed-tekst.md](reference/fremmed-tekst.md) |
 | Chat og strømming i nettleseren, push fra agenten | skillen `pwa` |
