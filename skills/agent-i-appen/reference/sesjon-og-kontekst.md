@@ -47,9 +47,22 @@ selv kan endre, og en skrivepolitikk i kode. Referanse: `reiseapp/agent/`.
   brukermeldingene.
 - Systemprompten lages én gang per sesjon, og en sesjon kan leve i dagevis. Fersk
   tilstand (dato og klokke i brukernes sone, og et kort utdrag av det appen viser nå)
-  legges inn med en `before_agent_start`-krok, som kjører før hver tur og returnerer
-  `{ systemPrompt: h.systemPrompt + '\n\nSlik står det til nå: …' }`. Hent med
-  tidsavbrudd og en kort cache, og la en del som feiler bare bli borte.
+  legges inn med en `before_agent_start`-krok, som kjører før hver tur. **Legg den i en
+  seksjon, ikke i en ny prompt:** `h.systemPromptOptions.sections.situasjon = tekst`
+  (Pi ≥ 0.86). Da legger Pi bare endringen inn i tråden, og prompt-cachen står. Å
+  *returnere* `{ systemPrompt: … }` erstatter hele prompten først i forespørselen, og med
+  klokka i teksten bommer cachen på hele tråden for hver melding. Hent med tidsavbrudd og
+  en kort cache, og la en del som feiler bare bli borte.
+- **Komprimering skjer når `kontekst > vindu − reserveTokens`** (standard 16 384). Med et
+  vindu på én million tokens skjer det først ved rundt 984 000, og lange tråder blir dyre.
+  Sett `compaction.modelOverrides['<provider>/<id>'] = { reserveTokens: vindu − 120 000 }`
+  for hver modell i katalogen.
+- **Mål forbruket**, ellers vet du ikke om cachen virker: i `message_end` har
+  `message.usage` `input`, `output`, `cacheRead`, `cacheWrite` og `cost.total`. Skriv én
+  linje per svar og summer per dag. Andelen fra cachen er
+  `cacheRead / (input + cacheRead + cacheWrite)`.
+- `cacheWarming` er `streaming` som standard (bare mens en kjøring pågår). Sett den til
+  `off` i bakgrunnsagenter.
 - Det agenten får av data slankes bevisst: bildelister ut, men ett bilde per sted (så den
   kan vise det), vedlegg som `{ navn, url }` (så den kan lese billetten).
 - Bilder til modellen skaleres på serveren til 1568 px lengste side, JPEG 80, `.rotate()`
@@ -87,9 +100,27 @@ selv kan endre, og en skrivepolitikk i kode. Referanse: `reiseapp/agent/`.
 - Tolerant tekstmatch mot egne data: `toLowerCase().normalize('NFD')`, strip kombinerende
   tegn, alt utenom `a-z0-9æøå` til mellomrom, alias-liste per sted, typeport.
 
+## Kjøringen og hva brukeren ser
+
+- **Ferdig er `agent_settled`, ikke `agent_end`.** Etter `agent_end` kan Pi fortsatt prøve
+  igjen eller komprimere og fortsette (`willRetry`).
+- **En melding sendt underveis: `steer`, ikke `followUp`.** Den kommer inn etter
+  verktøykallene som pågår, så «nei, stua» retter kursen. Ellers kommer den rett etter
+  svaret, som en kø. To meldinger tett i tett, før modellen har svart, blir ett svar på
+  begge (`['user','user','assistant']`).
+- **Steg med innhold:** `tool_execution_start` har `args`. Vis ett ufarlig felt
+  (søkeordet, vertsnavnet i en adresse), aldri hele argumentene. De kan inneholde e-post
+  eller annet privat.
+- `auto_retry_start` (`attempt`, `maxAttempts`) og `compaction_start` vises som egne
+  status-steg som ikke telles som verktøy, sammen med «Tar med det du skrev» når en
+  `steer`-melding kommer inn.
+
 ## Testing
 
 Agentloopen mot Pi sin faux-provider (ingen nettverk), **gjennom samme samtale-modul som
 drift bruker** — testene på `agent.prompt()` så aldri kø-, id- og opptatt-feilene. Assert
-rekkefølge og antall hendelser (`['user','assistant','user','assistant']`, én `ferdig`,
-`koet.id === andre.id`).
+rekkefølge og antall hendelser (med `followUp`: `['user','assistant','user','assistant']`;
+med `steer`: `['user','user','assistant']` når to meldinger kommer før svaret; én `ferdig`,
+`koet.id === andre.id`). For å teste `steer` midt i en kjøring: et testverktøy som venter
+på et løfte du slipper etter at den andre meldingen er sendt, og assert at modellens neste
+kall ser den.
