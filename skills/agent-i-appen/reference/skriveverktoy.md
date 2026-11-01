@@ -403,6 +403,24 @@ fysisk og kan styres av fremmed tekst. Alt dette, i kode:
   NFKD-normalisering så bokstavvarianter ikke slipper forbi;
 - modellen ser et minimum av felt om hver enhet.
 
+## 10. Ferdigheter ved behov
+
+Når alle ferdighetenes regler står i systemprompten, vokser den for hver ny ferdighet. Vi
+gikk fra 44 000 til 24 000 tegn.
+
+- En ferdighet med `vedBehov` (én linje) står bare med linja. Reglene hentes med
+  `les_ferdighet { navn }`, der navnet er en enum av de kjente ferdighetene, aldri en fri
+  sti.
+- **Sperren håndheves i koden.** Politikken blokkerer verktøyene til ferdigheten til et
+  vellykket `les_ferdighet`-resultat for den står på grenen. Grunnen sier hva agenten skal
+  gjøre («kall les_ferdighet med navnet …»).
+- Trimmingen av gamle verktøyresultater skal la reglene stå. En komprimering fjerner dem,
+  og da henter agenten dem igjen fordi sperren slår til.
+- **Alltid med:** det som brukes hver dag, og regler som alltid må gjelde (sletting, e-post).
+- Testene av hver ferdighet laster alle reglene (`vedBehov: false`). Én egen test dekker
+  sperren.
+- Verktøyerklæringene er ofte den største delen og blir ikke mindre av dette. Mål begge.
+
 ## Sjekkliste
 
 - [ ] Verktøyene skriver gjennom appens HTTP-API, ikke i lagringen
@@ -420,3 +438,5 @@ fysisk og kan styres av fremmed tekst. Alt dette, i kode:
       bare på brukerens egne ord, journal over gjennomførte endringer
 - [ ] Sesjonen laster ingenting fra `~/.pi` (`noExtensions`, `noSkills`, …) og har
       `noTools: 'builtin'`
+- [ ] Ferdigheter ved behov: én linje i prompten, verktøyene sperret i koden til reglene
+      er hentet, og reglene står igjen etter trimmingen
